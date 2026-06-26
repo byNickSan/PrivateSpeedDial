@@ -1,0 +1,17 @@
+{
+  "name": "private-speed-dial",
+  "version": "0.1.0",
+  "description": "Lightweight, private cross-browser speed dial (dev tooling only; not bundled into the extension).",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "lint": "web-ext lint --source-dir=.",
+    "lint:js": "eslint src",
+    "build": "web-ext build --source-dir=. --overwrite-dest --ignore-files=package.json package-lock.json node_modules .github README.md eslint.config.mjs .editorconfig amo-metadata.json tools docs",
+    "start": "web-ext run --source-dir=."
+  },
+  "devDependencies": {
+    "eslint": "^10.5.0",
+    "web-ext": "^10.4.0"
+  }
+}

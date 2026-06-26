@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Private Speed Dial</title>
+  <link rel="icon" type="image/png" href="../../assets/icons/icon-48.png">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="bg"></div>
+  <div id="bg-overlay"></div>
+
+  <header id="topbar">
+    <nav id="tabs"></nav>
+    <div class="topbar-right">
+      <span id="sync-status" class="sync-status" hidden></span>
+      <button id="lock-toggle" class="icon-btn" title="Lock"></button>
+      <button id="theme-toggle" class="icon-btn" title="Theme"></button>
+      <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <aside id="widgets-left" class="widgets-col"></aside>
+    <section id="grid-wrap">
+      <div id="search"></div>
+      <div id="grid"></div>
+    </section>
+    <aside id="widgets-right" class="widgets-col"></aside>
+  </main>
+  <div id="widgets-bottom" class="widgets-row"></div>
+
+  <div id="newtab-prompt" class="banner" hidden>
+    <div class="banner-text">
+      <strong data-i18n="newtab.promptTitle"></strong>
+      <span data-i18n="newtab.promptBody"></span>
+    </div>
+    <div class="row">
+      <button id="newtab-no" class="btn ghost" data-i18n="newtab.keepBlank"></button>
+      <button id="newtab-yes" class="btn primary" data-i18n="newtab.enable"></button>
+    </div>
+  </div>
+
+  <div id="minimal" class="minimal-view" hidden>
+    <button id="reveal" class="btn primary">Speed Dial</button>
+  </div>
+
+  <div id="onboarding" class="onboarding" hidden></div>
+
+  <div id="modal-root"></div>
+
+  <div id="footer" class="footer">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3z"/></svg>
+    <span>© <span id="footer-year">2026</span> Private Speed Dial</span>
+  </div>
+
+  <datalist id="tz-list">
+    <option value="Europe/Moscow"></option>
+    <option value="Europe/London"></option>
+    <option value="Europe/Paris"></option>
+    <option value="Europe/Berlin"></option>
+    <option value="Europe/Prague"></option>
+    <option value="America/New_York"></option>
+    <option value="America/Los_Angeles"></option>
+    <option value="Asia/Tokyo"></option>
+    <option value="Asia/Dubai"></option>
+    <option value="Asia/Shanghai"></option>
+    <option value="Australia/Sydney"></option>
+    <option value="UTC"></option>
+  </datalist>
+
+  <!-- platform -->
+  <script src="../lib/browser-api.js"></script>
+  <!-- view helpers -->
+  <script src="../lib/dom.js"></script>
+  <script src="../lib/ui.js"></script>
+  <script src="../lib/controls.js"></script>
+  <script src="../lib/i18n.js"></script>
+  <script src="../lib/regions.js"></script>
+  <!-- domain -->
+  <script src="../lib/schema.js"></script>
+  <script src="../lib/storage.js"></script>
+  <script src="../lib/sync.js"></script>
+  <script src="../lib/store.js"></script>
+  <!-- view appliers -->
+  <script src="../lib/themes.js"></script>
+  <script src="../lib/animations.js"></script>
+  <script src="../lib/backgrounds.js"></script>
+  <!-- services -->
+  <script src="../lib/icons.js"></script>
+  <script src="../lib/fonts.js"></script>
+  <script src="../lib/reminders.js"></script>
+  <script src="../lib/keyboard.js"></script>
+  <script src="../lib/dnd.js"></script>
+  <script src="../lib/search.js"></script>
+  <!-- widget registry MUST load before widgets that self-register -->
+  <script src="../lib/widgets/registry.js"></script>
+  <script src="../lib/widgets/net-widget.js"></script>
+  <script src="../lib/widgets/weather-icons.js"></script>
+  <script src="../lib/widgets/radar-map.js"></script>
+  <script src="../lib/widgets/weather.js"></script>
+  <script src="../lib/widgets/fx.js"></script>
+  <script src="../lib/widgets/stocks.js"></script>
+  <script src="../lib/widgets/gold.js"></script>
+  <script src="../lib/widgets/clock.js"></script>
+  <script src="../lib/widgets/notes.js"></script>
+  <script src="../lib/widgets/bookmarks.js"></script>
+  <script src="../lib/widgets/feed.js"></script>
+  <script src="../lib/widgets/ai.js"></script>
+  <script src="../lib/widgets/tasks.js"></script>
+  <script src="../lib/widgets/calendar.js"></script>
+  <!-- view + bootstrap -->
+  <script src="../lib/render.js"></script>
+  <script src="../lib/settings-ui.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+      - name: Validate manifest.json is valid JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
+      # The repo manifest is Firefox-native (event-page background.scripts), so web-ext
+      # and addons-linter lint it directly with no swap.
+      - name: web-ext lint
+        run: npx --yes web-ext@8 lint --source-dir=. --warnings-as-errors
+      - name: ESLint
+        run: npx --yes eslint@9 src
+
+  build:
+    needs: lint
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build extension packages
+        run: |
+          VERSION=$(node -e "console.log(require('./manifest.json').version)")
+          SHA=$(git rev-parse --short HEAD)
+          CONTENTS="manifest.json src _locales assets"
+          node tools/make-geo.js || echo "::warning::geo outline generation failed; radar falls back to a grid"
+          zip -r firefox.zip $CONTENTS
+          node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json'));m.background={service_worker:'src/background.js'};fs.writeFileSync('manifest.json',JSON.stringify(m,null,2));"
+          zip -r chrome.zip $CONTENTS
+          git checkout -- manifest.json
+          echo "name=private-speed-dial-${VERSION}-${SHA}" >> "$GITHUB_OUTPUT"
+        id: pack
+      - name: Upload Chrome build
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.pack.outputs.name }}-chrome
+          path: chrome.zip
+      - name: Upload Firefox build
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.pack.outputs.name }}-firefox
+          path: firefox.zip

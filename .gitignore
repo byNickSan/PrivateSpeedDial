@@ -1,0 +1,20 @@
+# Build artifacts
+web-ext-artifacts/
+*.zip
+dist/
+
+# Dependencies
+node_modules/
+
+# Safari conversion output
+*.xcodeproj/
+*.xcworkspace/
+build/
+DerivedData/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/

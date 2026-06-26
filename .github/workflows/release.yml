@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Check manifest version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          MANIFEST=$(node -e "console.log(require('./manifest.json').version)")
+          echo "tag=$TAG manifest=$MANIFEST"
+          if [ "$TAG" != "$MANIFEST" ]; then
+            echo "::error::Tag ($TAG) does not match manifest version ($MANIFEST)"; exit 1
+          fi
+
+      # Per-browser packages. Firefox/AMO uses the repo manifest (event-page scripts).
+      # Chrome/Edge/Safari need a service worker, so we swap it for those zips.
+      - name: Build downloadable packages (chrome, edge, firefox, safari)
+        run: |
+          CONTENTS="manifest.json src _locales assets"
+          node tools/make-geo.js || echo "::warning::geo outline generation failed; radar falls back to a grid"
+          zip -r firefox.zip $CONTENTS
+          node -e "const fs=require('fs');const m=JSON.parse(fs.readFileSync('manifest.json'));m.background={service_worker:'src/background.js'};fs.writeFileSync('manifest.json',JSON.stringify(m,null,2));"
+          zip -r chrome.zip $CONTENTS
+          cp chrome.zip edge.zip
+          cp chrome.zip safari.zip
+          git checkout -- manifest.json
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            chrome.zip
+            edge.zip
+            firefox.zip
+            safari.zip
+
+  # Auto-publish to Firefox AMO (listed) only, for now. Skips silently if AMO secrets are unset.
+  # Note: the FIRST listed version may need manual creation on addons.mozilla.org; later versions auto-submit.
+  # This same listing also covers Firefox for Android (mobile).
+  publish-amo:
+    needs: package
+    runs-on: ubuntu-latest
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+      - name: Generate radar base outline (optional)
+        if: env.AMO_JWT_ISSUER != ''
+        run: node tools/make-geo.js || echo "::warning::geo outline generation failed; radar falls back to a grid"
+      - name: Sign & submit to AMO
+        if: env.AMO_JWT_ISSUER != ''
+        run: >
+          npx --yes web-ext@8 sign --channel=listed
+          --api-key="$AMO_JWT_ISSUER" --api-secret="$AMO_JWT_SECRET"
+          --amo-metadata=amo-metadata.json
+          --approval-timeout=0
+          --source-dir=.
+          --ignore-files package.json package-lock.json node_modules .github README.md eslint.config.mjs .editorconfig amo-metadata.json tools docs
