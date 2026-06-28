@@ -10,7 +10,8 @@
       try { return new URL(url).origin + "/favicon.ico"; } catch (e) { return ""; }
     }
 
-    // Candidates largest-first (apple-touch-icon ~180px) down to favicon.ico.
+    // Candidates largest-first (apple-touch-icon ~180px) down to favicon.ico, then a third-party favicon
+    // service as a last resort (covers sites whose icon lives only in HTML, e.g. youtube/zheleza).
     function faviconCandidates(url) {
       try {
         var o = new URL(url).origin;
@@ -18,9 +19,14 @@
           o + "/apple-touch-icon.png",
           o + "/apple-touch-icon-precomposed.png",
           o + "/favicon.svg",
-          o + "/favicon.ico"
-        ];
+          o + "/favicon.ico",
+          serviceIconUrl(url)
+        ].filter(Boolean);
       } catch (e) { return []; }
+    }
+    // Third-party favicon service (DuckDuckGo) — used only as a fallback; sends the dial's host to DDG.
+    function serviceIconUrl(url) {
+      try { return "https://icons.duckduckgo.com/ip3/" + new URL(url).host + ".ico"; } catch (e) { return ""; }
     }
 
     function libraryIcon(state, refId) {
@@ -124,8 +130,46 @@
         return finish(cands);
       }).catch(function () { return []; });
     }
-    function resolveBestIcon(pageUrl) { return gatherIcons(pageUrl).then(function (list) { return list[0] || ""; }); }
+    // Best icon from the page's own HTML (private; needs host permission); falls back to the favicon
+    // service so a dial always ends up with a real icon even without a host grant.
+    function resolveBestIcon(pageUrl) { return gatherIcons(pageUrl).then(function (list) { return list[0] || serviceIconUrl(pageUrl); }); }
 
-    return { faviconUrl: faviconUrl, faviconCandidates: faviconCandidates, resolveBestIcon: resolveBestIcon, gatherIcons: gatherIcons, libraryIcon: libraryIcon, letterDataUrl: letterDataUrl, importFile: importFile };
+    function blobToDataUrl(blob) {
+      return new Promise(function (resolve, reject) {
+        var fr = new FileReader();
+        fr.onload = function () { resolve(fr.result); };
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+      });
+    }
+    // Download an icon and return a self-contained data: URL (SVG kept as-is; raster downscaled to 128px
+    // webp/png) so the dial renders the icon from storage forever — never re-fetching it from the network.
+    // Needs a cross-origin read (host permission); rejects otherwise (caller then caches the bare URL).
+    function iconToDataUrl(url) {
+      if (/^data:/i.test(url)) return Promise.resolve(url);
+      return fetch(url, { credentials: "omit" }).then(function (r) {
+        if (!r.ok) throw new Error("http " + r.status);
+        return r.blob();
+      }).then(function (blob) {
+        if (blob.type === "image/svg+xml" || /\.svg($|\?)/i.test(url)) return blobToDataUrl(blob);
+        return new Promise(function (resolve, reject) {
+          var obj = URL.createObjectURL(blob), img = new Image();
+          img.onload = function () {
+            var max = 128, scale = Math.min(1, max / Math.max(img.width || max, img.height || max));
+            var w = Math.max(1, Math.round((img.width || max) * scale)), h = Math.max(1, Math.round((img.height || max) * scale));
+            var c = document.createElement("canvas"); c.width = w; c.height = h;
+            c.getContext("2d").drawImage(img, 0, 0, w, h);
+            URL.revokeObjectURL(obj);
+            var d = c.toDataURL("image/webp", 0.85);
+            if (d.indexOf("image/webp") < 0) d = c.toDataURL("image/png");
+            resolve(d);
+          };
+          img.onerror = function () { URL.revokeObjectURL(obj); reject(new Error("decode")); };
+          img.src = obj;
+        });
+      });
+    }
+
+    return { faviconUrl: faviconUrl, faviconCandidates: faviconCandidates, serviceIconUrl: serviceIconUrl, resolveBestIcon: resolveBestIcon, iconToDataUrl: iconToDataUrl, gatherIcons: gatherIcons, libraryIcon: libraryIcon, letterDataUrl: letterDataUrl, importFile: importFile };
   })();
 })();

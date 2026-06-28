@@ -56,20 +56,25 @@
         json = await fetchJson(mod.buildUrl(cfg));
         data = mod.parse(json, cfg);
       }
-      var ts = Date.now(), id = inst.instId;
+      var ts = Date.now(), id = inst.instId, sig = cfgSig(cfg);
       SD.store.commit(function (s) {
         var x = s.widgetInstances.filter(function (w) { return w.instId === id; })[0];
-        if (x) x.cache = { ts: ts, data: data };
+        if (x) x.cache = { ts: ts, data: data, sig: sig };
       });
       return { data: data, ts: ts };
     }
+    // Signature of the fetch-affecting config; cached data tied to it is invalidated when the config
+    // changes (e.g. forecast days), so the view never shows data fetched for the previous settings.
+    function cfgSig(cfg) { try { return JSON.stringify(cfg); } catch (e) { return ""; } }
 
     // Stale-while-revalidate: cached data returns immediately (never blocks on the network); past TTL a
     // background refresh runs and calls onUpdate(res) when it lands. First load (no cache) blocks once.
     async function load(state, inst, mod, onUpdate) {
       var ttl = (mod.ttlMin || 15) * 60000;
       var cache = inst.cache;
-      if (cache && cache.data) {
+      // Cache is valid only if it was fetched for the CURRENT config (sig match); a config change forces
+      // a fresh fetch so the rendered data always matches the selected settings.
+      if (cache && cache.data && cache.sig === cfgSig(inst.config)) {
         var stale = (Date.now() - cache.ts) >= ttl;
         if (stale && typeof onUpdate === "function") {
           refresh(inst, mod).then(function (r) { onUpdate({ data: r.data, ts: r.ts }); }).catch(function () { });

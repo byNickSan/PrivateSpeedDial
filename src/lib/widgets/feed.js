@@ -7,6 +7,7 @@
 (function () {
   "use strict";
   var TTL = 5 * 60000;
+  var pillScroll = null;   // active window-scroll handler for the floating "load new" pill (one at a time)
   var io = null;        // shared lazy-load observer; disconnected before each re-render (no leak)
   // Persisted feed cache (localStorage): a fresh new-tab shows news instantly, then refreshes in the
   // background. url -> { ts, items }. Items accumulate over a 2-day window (deduped); older ones expire.
@@ -121,7 +122,14 @@
       return r.arrayBuffer().then(function (buf) { return { text: decodeBuffer(buf, ct), finalUrl: r.url || url }; });
     });
   }
-  function txt(node, sel) { var e = node.querySelector(sel); return e ? e.textContent.trim() : ""; }
+  // Decode HTML entities left in feed text (CDATA / double-encoded titles show raw &amp; &#39; &quot;).
+  // Uses an inert DOMParser document (no script execution, no resource loads) — never innerHTML.
+  function decodeEntities(s) {
+    if (!s || s.indexOf("&") < 0) return s;
+    try { return new DOMParser().parseFromString("<!doctype html><title>" + s + "</title>", "text/html").title || s; }
+    catch (e) { return s; }
+  }
+  function txt(node, sel) { var e = node.querySelector(sel); return e ? decodeEntities(e.textContent.trim()) : ""; }
   function tagText(node, tag) { var e = node.getElementsByTagName(tag); return e.length ? e[0].textContent.trim() : ""; }
 
   // Universal preview fallback: read Open Graph/Twitter image from the article page (standard across the web).
@@ -468,8 +476,23 @@
         if (!n) return;   // no genuinely new items → no pill
         var old = wrap.querySelector(".feed-loadnew"); if (old) old.remove();
         var pill = D.el("button", { "class": "feed-loadnew", text: t("feed.loadNew", { N: String(n) }) });
-        pill.addEventListener("click", function () { shownKeys = allKeys(); paintResults(resultsFromCache(), maxTs(), true); });
+        // Float the pill to the top of the screen once the feed start is scrolled out of view; clicking it
+        // loads the new items and scrolls back to the start of the news block.
+        if (pillScroll) { window.removeEventListener("scroll", pillScroll); pillScroll = null; }
+        var onScroll = function () {
+          if (!pill.isConnected) { window.removeEventListener("scroll", onScroll); if (pillScroll === onScroll) pillScroll = null; return; }
+          pill.classList.toggle("floating", wrap.getBoundingClientRect().top < 0);
+        };
+        pillScroll = onScroll;
+        window.addEventListener("scroll", onScroll, { passive: true });
+        pill.addEventListener("click", function () {
+          window.removeEventListener("scroll", onScroll); if (pillScroll === onScroll) pillScroll = null;
+          shownKeys = allKeys(); paintResults(resultsFromCache(), maxTs(), true);
+          var y = window.scrollY + wrap.getBoundingClientRect().top - 12;
+          window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+        });
         wrap.insertBefore(pill, wrap.firstChild);
+        onScroll();
       });
     }
   }

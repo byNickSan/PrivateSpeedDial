@@ -247,7 +247,21 @@
     if (!state.settings.onboarded) SD.safe("onboarding", function () { showOnboarding(state); });
     else SD.safe("newtab mode", function () { applyNewtabMode(state); });
     SD.safe("reminders.reconcile", function () { SD.reminders.reconcile(state); });
+    SD.safe("scrollTop", setupScrollTop);
     startAutoImageTimer();
+  }
+
+  // Fixed bottom-right "back to top" button; appears once the page is scrolled down.
+  function setupScrollTop() {
+    var btn = document.createElement("button");
+    btn.id = "scroll-top"; btn.type = "button"; btn.hidden = true;
+    btn.setAttribute("aria-label", SD.i18n.t("common.toTop") || "To top");
+    btn.textContent = "↑";
+    btn.addEventListener("click", function () { window.scrollTo({ top: 0, behavior: "smooth" }); });
+    document.body.appendChild(btn);
+    var onScroll = function () { btn.hidden = window.scrollY < 400; };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
   }
 
   document.addEventListener("DOMContentLoaded", main);

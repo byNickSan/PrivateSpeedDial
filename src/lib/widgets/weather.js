@@ -499,7 +499,17 @@
   }
 
   // clearCache=true drops cached data so the next render refetches
-  function setW(ctx, mut, clearCache) { ctx.commitCfg(mut); if (clearCache) ctx.cache.set(null); }
+  // Config change + (optional) cache reset in ONE atomic commit. Two separate commits race: the config
+  // commit rebuilds the card while the still-fresh cache shows stale data, and the later cache-null commit
+  // doesn't rebuild (the card signature excludes cache) — so a fetch-affecting change lagged by one step.
+  function setW(ctx, mut, clearCache) {
+    SD.store.commit(function (s) {
+      var x = (s.widgetInstances || []).filter(function (w) { return w.instId === ctx.inst.instId; })[0];
+      if (!x) return;
+      mut(x.config);
+      if (clearCache) x.cache = null;
+    });
+  }
 
   function renderSettings(el, ctx) {
     var c = ctx.controls, t = ctx.i18n.t, cfg = ctx.cfg();

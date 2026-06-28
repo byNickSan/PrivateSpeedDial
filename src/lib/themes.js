@@ -42,6 +42,7 @@
       r.setProperty("--tile-radius", state.settings.tile.radius + "px");
       r.setProperty("--tile-w", state.settings.tile.width + "px");
       r.setProperty("--tile-h", state.settings.tile.height + "px");
+      r.setProperty("--tile-ar", (state.settings.tile.width / state.settings.tile.height) || 1);
       r.setProperty("--grid-cols", state.settings.grid.columns);
       r.setProperty("--grid-gap", state.settings.grid.gap + "px");
     }

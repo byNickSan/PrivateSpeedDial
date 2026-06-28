@@ -4,6 +4,7 @@
   --bg: #0f172a; --surface: #1e293b; --text: #e2e8f0; --accent: #38bdf8; --border: #334155;
   --font-family: system-ui, sans-serif; --font-size: 13px;
   --tile-w: 120px; --tile-h: 110px; --tile-radius: 16px; --grid-cols: 6; --grid-gap: 16px;
+  --tile-ar: 1.09; --tile-max: calc(var(--tile-w) * 1.6);
   --anim-speed: 180ms; --bg-blur: 0px; --bg-dim: 0; --bg-anim-speed: 14000ms;
 }
 
@@ -54,6 +55,10 @@ body.tab-hidden #bg.bg-animated { animation-play-state: paused; }
 #perf-overlay { position: fixed; top: 6px; left: 8px; z-index: 9999; pointer-events: none; font: 600 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; color: #7CFC00; background: rgba(0,0,0,.45); padding: 2px 6px; border-radius: 6px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .w-key-help { font-size: 12px; color: var(--accent); text-decoration: none; }
 .w-key-help:hover { text-decoration: underline; }
+#scroll-top { position: fixed; right: 18px; bottom: 18px; z-index: 50; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 85%, transparent); color: var(--text); font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.3); backdrop-filter: blur(6px); }
+#scroll-top[hidden] { display: none; }
+#scroll-top:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.feed-loadnew.floating { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 51; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 .sync-status.offline { color: #fbbf24; }
 .icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 36px; height: 36px; cursor: pointer; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; }
 .icon-btn.active { border-color: var(--accent); color: var(--accent); }
@@ -70,9 +75,12 @@ body.is-locked .widget-title { cursor: default; }
 #main { display: flex; gap: 22px; padding: 18px 28px 40px; align-items: flex-start; }
 #grid-wrap { flex: 1; min-width: 0; }
 #grid {
-  display: grid; grid-template-columns: repeat(auto-fill, var(--tile-w));
+  display: grid; grid-template-columns: repeat(var(--grid-cols), minmax(0, 1fr));
   gap: var(--grid-gap); justify-content: start; min-width: 0;
-  max-width: calc(var(--grid-cols) * var(--tile-w) + (var(--grid-cols) - 1) * var(--grid-gap));
+  /* Exactly the configured number of columns, each stretching to fill the available width so tiles grow
+     on large screens; capped via max-width so a tile never exceeds --tile-max. Narrow screens fall back
+     to auto-fill column counts in the media queries below. */
+  max-width: calc(var(--grid-cols) * var(--tile-max) + (var(--grid-cols) - 1) * var(--grid-gap));
 }
 #grid.anim-in { animation: group-in var(--anim-speed) ease; }
 body[data-group-anim="slide"] #grid.anim-in { animation: group-slide var(--anim-speed) ease; }
@@ -82,7 +90,8 @@ body[data-group-anim="none"] #grid.anim-in { animation: none; }
 
 /* Dial tiles */
 .dial {
-  position: relative; width: 100%; max-width: var(--tile-w); height: var(--tile-h);
+  position: relative; width: 100%; max-width: var(--tile-max);
+  min-height: var(--tile-h); container-type: inline-size;
   background: var(--tile-color, var(--surface)); border: 1px solid var(--border);
   border-radius: var(--tile-radius); display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 8px; text-decoration: none; color: var(--text);
@@ -90,8 +99,9 @@ body[data-group-anim="none"] #grid.anim-in { animation: none; }
   outline: 2px solid transparent; outline-offset: 2px;
 }
 .dial:focus-visible { outline-color: var(--accent); }
-.dial-ico-wrap { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
-.dial-ico { max-width: 48px; max-height: 48px; border-radius: 10px; }
+/* Icon scales with the tile (container query units) so dials look right when they grow on large screens. */
+.dial-ico-wrap { width: clamp(40px, 42cqw, 80px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.dial-ico { max-width: 100%; max-height: 100%; border-radius: 10px; }
 .dial-ico.dial-ico-fill { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: contain; }
 .dial-label { color: var(--label-color, var(--text)); font-size: var(--font-size); text-align: center; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dial-edit { position: absolute; top: 4px; right: 4px; opacity: 0; background: rgba(0,0,0,.4); color: #fff; border: none; border-radius: 6px; cursor: pointer; width: 22px; height: 22px; }
@@ -151,8 +161,11 @@ body.no-dials #grid { display: none; }
 .widget-settings-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; }
 .widget-settings { max-width: 380px; }
 .widget-settings-modal { max-width: 460px; max-height: 80vh; overflow: auto; margin-top: 0; }
-.widget-settings .set-row { gap: 12px; }
-.widget-settings input, .widget-settings select { max-width: 200px; }
+.widget-settings .set-row { gap: 12px; flex-wrap: wrap; }
+.widget-settings .set-row > span { flex: 1 1 120px; min-width: 0; }
+.widget-settings .set-row > input, .widget-settings .set-row > select,
+.widget-settings .set-row > .pair, .widget-settings .set-row > a, .widget-settings .set-row > button { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.widget-settings input, .widget-settings select { max-width: 200px; box-sizing: border-box; }
 .w-row { display: flex; justify-content: space-between; padding: 2px 0; }
 .w-cache, .w-err { font-size: 11px; opacity: .6; margin-top: 6px; }
 /* Bookmark-to-dial drop: highlight the whole grid while a bookmark is dragged over it. */
@@ -202,6 +215,10 @@ body.no-dials #grid { display: none; }
 #widgets-bottom .widget-card.w-feed { flex-basis: 100%; max-width: 100%; }
 .feed-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
 .feed-grid { display: grid; grid-template-columns: repeat(var(--feed-cols, 3), minmax(0, 1fr)); gap: 12px; }
+/* Responsive column cap so a news card preview always fits: never more than the configured count, but
+   fewer on narrower viewports. (<=600px collapses to 1 column in the mobile block below.) */
+@media (max-width: 1220px) { .feed-grid { grid-template-columns: repeat(min(var(--feed-cols, 3), 3), minmax(0, 1fr)); } }
+@media (max-width: 900px)  { .feed-grid { grid-template-columns: repeat(min(var(--feed-cols, 3), 2), minmax(0, 1fr)); } }
 .feed-card { min-width: 0; container-type: inline-size; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--text); text-decoration: none; }
 .feed-card:hover { border-color: var(--accent); }
 .feed-media { position: relative; width: 100%; height: clamp(150px, 60cqw, 360px); border-radius: 8px; overflow: hidden; margin-bottom: 4px; background: var(--surface); }
@@ -299,6 +316,15 @@ body.no-dials #grid { display: none; }
 .w-index-chg.down { color: #dc2626; }
 .w-spark { display: block; width: 100%; height: 36px; margin-top: 4px; }
 /* Weather: head/meta/hourly/forecast + styles */
+/* Adaptive sizing: icons + temperature scale with the widget column width (container queries), so they
+   aren't tiny on a wide tablet column. The inline width/height the JS sets on the SVG is the floor. */
+.w-weather { container-type: inline-size; }
+.w-head .wi { width: clamp(30px, 22cqw, 64px); height: auto; }
+.w-compact .wi { width: clamp(22px, 12cqw, 44px); height: auto; }
+.w-htc .wi { width: clamp(56px, 32cqw, 120px); height: auto; }
+.w-day .wi { width: clamp(24px, 9cqw, 48px); height: auto; }
+.w-hour .wi { width: clamp(20px, 7cqw, 40px); height: auto; }
+.w-temp { font-size: clamp(28px, 15cqw, 46px); }
 .w-head { display: flex; align-items: center; gap: 8px; }
 .w-compact { display: flex; align-items: center; gap: 8px; }
 .w-compact .w-place { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -317,7 +343,7 @@ body.no-dials #grid { display: none; }
 .w-weather[data-style="htc"] { margin: -12px; padding: 16px; border-radius: 14px; }
 .w-htc { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; }
 .w-htc .wi { grid-row: span 2; }
-.w-htc-temp { font-size: 46px; font-weight: 200; line-height: 1; }
+.w-htc-temp { font-size: clamp(46px, 24cqw, 76px); font-weight: 200; line-height: 1; }
 .w-htc-place { font-size: 14px; opacity: .85; }
 .w-htc-cond { grid-column: 1 / -1; font-size: 13px; opacity: .7; }
 .w-weather[data-style="htc"][data-cond="clear"] { background: color-mix(in srgb, #f59e0b 16%, var(--surface)); }
@@ -489,15 +515,17 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .modal-box h3 { margin-top: 0; }
 .dial-editor label { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
 .settings { text-align: left; }
-.settings .set-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 14px; margin: 7px 0; }
-.settings .set-row > span { flex: 1; min-width: 0; }
-.settings .set-row > select, .settings .set-row > input[type=text], .settings .set-row > input[type=number], .settings .set-row > input[type=url] { flex: 0 0 150px; max-width: 150px; }
+.settings .set-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 14px; margin: 7px 0; flex-wrap: wrap; }
+.settings .set-row > span { flex: 1 1 120px; min-width: 0; }
+.settings .set-row > select, .settings .set-row > input[type=text], .settings .set-row > input[type=number], .settings .set-row > input[type=url] { flex: 0 1 150px; max-width: 150px; min-width: 0; box-sizing: border-box; }
+.settings .set-row > .pair { flex: 0 1 150px; min-width: 0; max-width: 100%; }
 .dial-editor input, .dial-editor select, .settings input, .settings select { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 7px; font: inherit; }
 .settings input[type=checkbox] { width: auto; }
 .set-section { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 14px; }
 .set-section h4 { margin: 6px 0; opacity: .85; }
 .subsec { padding-left: 10px; border-left: 2px solid var(--border); margin: 8px 0; }
-.pair { display: flex; gap: 6px; }
+.pair { display: flex; gap: 6px; min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.pair > * { flex: 1 1 80px; min-width: 0; max-width: 100%; box-sizing: border-box; }
 .scheme-editor { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .icon-library, .cities { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .cities { flex-direction: column; gap: 10px; }
@@ -622,6 +650,8 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 /* Dial editor: refresh-icon button + manual icon-variant picker (frame + corner check on selection) */
 .icon-refresh { margin-left: 6px; flex: 0 0 auto; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 15px; }
 .icon-variants { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 8px; }
+.icon-variant-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 60px; }
+.icon-variant-cap { font-size: 9px; line-height: 1.15; opacity: .65; text-align: center; word-break: break-word; }
 .icon-variant { position: relative; width: 46px; height: 46px; padding: 5px; background: var(--bg); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .icon-variant img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .icon-variant.sel { border-color: var(--accent); }

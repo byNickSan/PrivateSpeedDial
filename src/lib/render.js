@@ -164,37 +164,61 @@
         img.addEventListener("load", function () { fitIcon(img); });
         if (d.icon && d.icon.cachedUrl) {
           img.src = d.icon.cachedUrl;
-          img.addEventListener("error", function () { faviconChain(img, d, accent); });   // cached icon 404'd → fall back
+          img.addEventListener("error", function () { img.src = SD.icons.letterDataUrl(d.title, accent); }, { once: true });   // cached icon 404'd → letter
         } else {
-          faviconChain(img, d, accent);   // instant: favicon-candidate chain
-          upgradeIcon(d);                 // background: resolve the best icon once, cache it forever
+          img.src = SD.icons.letterDataUrl(d.title || d.url, accent);   // instant placeholder
+          resolveAndCache(d);   // probe candidates ONCE, cache the first that actually loads
         }
       } else {
         img.src = SD.icons.letterDataUrl(d.title, accent);
       }
       return img;
     }
+    function fmtKB(n) { return n < 1024 ? n + " B" : (n / 1024).toFixed(1) + " KB"; }
     // Small favicons (16–32px) render at native size and look tiny; scale them to fill the tile.
     function fitIcon(img) {
       var w = img.naturalWidth || 0;
       if (w && w < 40) img.classList.add("dial-ico-fill"); else img.classList.remove("dial-ico-fill");
     }
-    // Favicon-candidate chain (apple-touch-icon → favicon.svg → favicon.ico → letter tile).
-    function faviconChain(img, d, accent) {
-      var cands = SD.icons.faviconCandidates(normalizeUrl(d.url)), i = 0;
-      var tryNext = function () { img.src = i < cands.length ? cands[i++] : SD.icons.letterDataUrl(d.title || d.url, accent); };
-      img.addEventListener("error", tryNext);
-      tryNext();
+    // Probe URLs in priority order via a detached Image; resolve to the FIRST that actually loads (null if
+    // none). Each URL is requested at most once — no per-render re-probing, no 404 storms.
+    function firstThatLoads(urls) {
+      var i = 0;
+      return new Promise(function (resolve) {
+        var next = function () {
+          if (i >= urls.length) { resolve(null); return; }
+          var u = urls[i++];
+          if (!u) { next(); return; }
+          var t = new Image();
+          t.onload = function () { resolve(u); };
+          t.onerror = next;
+          t.src = u;
+        };
+        next();
+      });
     }
-    // Resolve the best icon from the page once (HTML/manifest parse) and cache it on the dial forever.
-    // Skipped per session after one attempt (avoids re-fetching the page on every render).
+    // Resolve a dial's icon once per session and cache it. Priority: site HTML/manifest icons (private,
+    // needs host permission) → site root favicons → favicon service. Only a URL that VERIFIABLY loads is
+    // cached, so a 404 candidate is never stored and never re-fetched on later renders.
     var iconTried = {};
-    function upgradeIcon(d) {
+    function resolveAndCache(d) {
       if (!d || !d.id || !d.url || iconTried[d.id] || (d.icon && d.icon.cachedUrl)) return;
       iconTried[d.id] = 1;
-      SD.icons.resolveBestIcon(normalizeUrl(d.url)).then(function (url) {
+      var page = normalizeUrl(d.url);
+      var fallback = function () { return firstThatLoads(SD.icons.faviconCandidates(page)); };
+      var store = function (url) {
         if (!url) return;
         SD.store.commit(function (s) { var x = s.dials.filter(function (q) { return q.id === d.id; })[0]; if (x) { x.icon = x.icon || { type: "auto", value: "" }; x.icon.cachedUrl = url; } });
+      };
+      SD.icons.gatherIcons(page).then(function (list) {
+        var seen = {}, cands = [];
+        (list || []).concat(SD.icons.faviconCandidates(page)).forEach(function (u) { if (u && !seen[u]) { seen[u] = 1; cands.push(u); } });
+        return firstThatLoads(cands);
+      }, fallback).then(function (url) {
+        if (!url) return;
+        // Cache the icon BYTES (data: URL) so it renders from storage and is never re-fetched; if the
+        // cross-origin read is blocked, cache the bare URL (browser HTTP cache still helps).
+        SD.icons.iconToDataUrl(url).then(store, function () { store(url); });
       });
     }
     function setMiniIcon(mi, k, state) {
@@ -311,9 +335,19 @@
       var variantAdded = {};
       function addVariant(url) {
         if (!url || variantAdded[url]) return; variantAdded[url] = 1;
+        var wrap = D.el("div", { "class": "icon-variant-wrap" });
         var b = D.el("button", { "class": "icon-variant" + (model.icon && model.icon.cachedUrl === url ? " sel" : ""), type: "button", title: url });
         var im = document.createElement("img"); im.alt = ""; im.src = url;
-        im.addEventListener("error", function () { delete variantAdded[url]; b.remove(); });   // drop broken candidates
+        var cap = D.el("span", { "class": "icon-variant-cap", text: "…" });
+        im.addEventListener("error", function () { delete variantAdded[url]; wrap.remove(); });   // drop broken candidates
+        im.addEventListener("load", function () {
+          var dim = (im.naturalWidth || "?") + "×" + (im.naturalHeight || "?");
+          cap.textContent = dim;
+          // file weight needs a cross-origin read (host permission / CORS); skip silently if blocked
+          fetch(url, { credentials: "omit" }).then(function (r) { return r.ok ? r.blob() : null; }).then(function (bl) {
+            if (bl) cap.textContent = dim + " · " + fmtKB(bl.size);
+          }).catch(function () { });
+        });
         b.appendChild(im); b.appendChild(D.el("span", { "class": "icon-variant-check", text: "✓" }));
         b.addEventListener("click", function (e2) {
           e2.preventDefault();
@@ -321,7 +355,8 @@
           iconVariants.querySelectorAll(".icon-variant").forEach(function (x) { x.classList.remove("sel"); });
           b.classList.add("sel");
         });
-        iconVariants.appendChild(b);
+        wrap.appendChild(b); wrap.appendChild(cap);
+        iconVariants.appendChild(wrap);
       }
       function drawIconVariants(extra) {
         var show = fIcon.value === "auto" && !fFolder.checked && !!model.url;
@@ -468,6 +503,14 @@
           var cached = widgetCache[inst.instId];
           if (cached && cached.sig === sig) return cached.card;
           var card = widgetCard(inst, state);
+          // Hold the previous card's height on the rebuilt net card until its data lands, so the page
+          // doesn't jump (the skeleton is shorter than the rendered content) on a settings change.
+          var modK = SD.registry.byId(inst.type);
+          if (modK && modK.kind === "net") {
+            var prev = document.querySelector('.widget-card[data-wid="' + inst.instId + '"]');
+            var ph = prev ? prev.getBoundingClientRect().height : 0;
+            if (ph > 0) card.style.minHeight = ph + "px";
+          }
           widgetCache[inst.instId] = { sig: sig, card: card };
           return card;
         });
@@ -618,7 +661,7 @@
         } else {
           body.appendChild(SD.dom.el("div", { "class": "skeleton w-skel w-skel-" + inst.type, "aria-hidden": "true" }));
           var renderNet = function (res) {
-            try { mod.render(body, res, instCtx(inst)); widgetUpdated(body, res); }
+            try { mod.render(body, res, instCtx(inst)); widgetUpdated(body, res); card.style.minHeight = ""; }
             catch (e) { console.warn("[speed-dial] render " + inst.type + ":", e); showErr(body); }
           };
           SD.netWidget.load(state, inst, mod, renderNet).then(renderNet);
