@@ -13,6 +13,21 @@
       list[ni].focus();
     }
 
+    // Keyboard alternative to drag-and-drop: Alt+Arrow moves the focused dial by `delta` positions.
+    function moveDial(delta, st) {
+      if (st.settings.lockDials || st.settings.locked) return false;
+      var list = dials(), cur = list.indexOf(document.activeElement);
+      if (cur < 0) return false;
+      var ni = Math.max(0, Math.min(list.length - 1, cur + delta));
+      if (ni === cur) return false;
+      var fromId = list[cur].getAttribute("data-id"), toId = list[ni].getAttribute("data-id");
+      if (!fromId || !toId || !SD.dnd || !SD.dnd.reorder) return false;
+      SD.dnd.reorder(st, fromId, toId);
+      // Re-focus the moved dial after the re-render.
+      requestAnimationFrame(function () { var el = document.querySelector('#grid .dial[data-id="' + fromId + '"]'); if (el) el.focus(); });
+      return true;
+    }
+
     // Don't intercept keys while typing in a field (e.g. the search box).
     function inField(e) {
       var t = (e.target.tagName || "").toLowerCase();
@@ -24,6 +39,11 @@
       if (!st || !st.settings.animation.keyboardNav) return;
       if (inField(e) || document.querySelector(".modal.open")) return;
       var cols = st.settings.grid.columns || 6;
+      if (e.altKey && /^Arrow/.test(e.key)) {   // Alt+Arrow = reorder the focused dial (D&D alternative)
+        var d = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
+        if (d != null && moveDial(d, st)) e.preventDefault();
+        return;
+      }
       switch (e.key) {
         case "ArrowRight": move(1); e.preventDefault(); break;
         case "ArrowLeft": move(-1); e.preventDefault(); break;

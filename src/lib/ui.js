@@ -2,20 +2,38 @@
 (function () {
   "use strict";
   SD.ui = (function () {
+    var FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
     // Returns a close function.
     function openModal(node) {
       var root = document.getElementById("modal-root");
+      var prevFocus = document.activeElement;   // restore focus to opener on close (a11y)
       var overlay = document.createElement("div");
       overlay.className = "modal open";
       var box = document.createElement("div");
       box.className = "modal-box";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-modal", "true");
       box.appendChild(node);
       overlay.appendChild(box);
       overlay.addEventListener("mousedown", function (e) { if (e.target === overlay) close(); });
       root.appendChild(overlay);
-      function onKey(e) { if (e.key === "Escape") { e.preventDefault(); close(); } }
+      function focusables() { return Array.prototype.slice.call(box.querySelectorAll(FOCUSABLE)); }
+      // Move focus into the dialog; trap Tab so it can't leave.
+      var firstF = focusables()[0];
+      if (firstF) { try { firstF.focus(); } catch (e) { /* noop */ } } else { box.tabIndex = -1; try { box.focus(); } catch (e2) { /* noop */ } }
+      function onKey(e) {
+        if (e.key === "Escape") { e.preventDefault(); close(); return; }
+        if (e.key !== "Tab") return;
+        var f = focusables(); if (!f.length) { e.preventDefault(); return; }
+        var a = f[0], z = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+        else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+      }
       document.addEventListener("keydown", onKey);
-      function close() { overlay.remove(); document.removeEventListener("keydown", onKey); }
+      function close() {
+        overlay.remove(); document.removeEventListener("keydown", onKey);
+        if (prevFocus && prevFocus.focus) { try { prevFocus.focus(); } catch (e) { /* noop */ } }
+      }
       return close;
     }
 

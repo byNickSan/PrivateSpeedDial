@@ -19,6 +19,7 @@
     document.body.classList.toggle("is-locked", !!state.settings.locked);
     document.documentElement.style.setProperty("--widget-col-w", (state.settings.widgetColWidth || 300) + "px");
     document.body.classList.toggle("no-dials", state.settings.showDials === false);
+    document.documentElement.setAttribute("data-density", state.settings.density === "compact" ? "compact" : "comfortable");
     applyPerfOverlay(!!state.settings.perfOverlay);
     if (lastGroup !== null && lastGroup !== state.settings.activeGroupId) {
       var grid = document.getElementById("grid");
@@ -257,10 +258,15 @@
     btn.id = "scroll-top"; btn.type = "button"; btn.hidden = true;
     btn.setAttribute("aria-label", SD.i18n.t("common.toTop") || "To top");
     btn.textContent = "↑";
-    btn.addEventListener("click", function () { window.scrollTo({ top: 0, behavior: "smooth" }); });
+    btn.addEventListener("click", function () {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      var sc = document.scrollingElement; if (sc && sc.scrollTo) sc.scrollTo({ top: 0, behavior: "smooth" });
+    });
     document.body.appendChild(btn);
-    var onScroll = function () { btn.hidden = window.scrollY < 400; };
-    window.addEventListener("scroll", onScroll, { passive: true });
+    var scrollY = function () { return window.scrollY || (document.scrollingElement && document.scrollingElement.scrollTop) || document.body.scrollTop || 0; };
+    var onScroll = function () { btn.hidden = scrollY() < 300; };
+    // capture:true so it fires regardless of which element is the actual scroller.
+    document.addEventListener("scroll", onScroll, { passive: true, capture: true });
     onScroll();
   }
 

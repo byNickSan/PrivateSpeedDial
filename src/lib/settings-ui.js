@@ -9,6 +9,7 @@
       var node = document.createElement("div");
       node.className = "settings";
       node.appendChild(h3(SD.i18n.t("settings.title")));
+      node.appendChild(searchBox(node));
       node.appendChild(sectionLanguage(state));
       node.appendChild(sectionLayout(state));
       node.appendChild(sectionTypography(state));
@@ -34,11 +35,35 @@
       closeBtn.addEventListener("click", close);
     }
 
+    // Live filter: hides setting rows whose label doesn't match, and any section left with no visible rows.
+    function searchBox(panel) {
+      var inp = document.createElement("input");
+      inp.type = "search"; inp.className = "settings-search";
+      inp.placeholder = SD.i18n.t("settings.search");
+      inp.addEventListener("input", function () {
+        var q = inp.value.trim().toLowerCase();
+        panel.querySelectorAll(".set-section").forEach(function (sec) {
+          var any = false;
+          sec.querySelectorAll(".set-row").forEach(function (r) {
+            var hit = !q || (r.textContent || "").toLowerCase().indexOf(q) >= 0;
+            r.style.display = hit ? "" : "none";
+            if (hit) any = true;
+          });
+          sec.style.display = (any || !q) ? "" : "none";
+        });
+      });
+      return inp;
+    }
+
     /* ---------- sections ---------- */
 
     function sectionLayout(s) {
       var sec = section("settings.section.layout");
-      sec.appendChild(row("settings.columns", num(s.settings.grid.columns, 1, 12, 1, function (v) { commit(function (x) { x.settings.grid.columns = v; }); })));
+      sec.appendChild(row("settings.density", sel([
+        ["comfortable", SD.i18n.t("density.comfortable")], ["compact", SD.i18n.t("density.compact")]
+      ], s.settings.density || "comfortable", function (v) { commit(function (x) { x.settings.density = v; }); })));
+      // 0 = Auto (intrinsic grid fits columns to width); >0 pins a fixed count (advanced override).
+      sec.appendChild(row("settings.columns", num(s.settings.grid.columns, 0, 12, 1, function (v) { commit(function (x) { x.settings.grid.columns = Math.max(0, v || 0); }); })));
       sec.appendChild(row("settings.rows", num(s.settings.grid.rows, 1, 12, 1, function (v) { commit(function (x) { x.settings.grid.rows = v; }); })));
       sec.appendChild(row("settings.gap", num(s.settings.grid.gap, 0, 64, 1, function (v) { commit(function (x) { x.settings.grid.gap = v; }); })));
       sec.appendChild(row("settings.tileSize", pair(

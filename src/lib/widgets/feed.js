@@ -165,6 +165,23 @@
     if (twitter) return twitter;
     var ls = head.match(/<link[^>]+rel\s*=\s*["']image_src["'][^>]*>/i);   // older standard some RU sites use
     if (ls) { var lc = ls[0].match(/href\s*=\s*["']([^"']+)["']/i); if (lc) return lc[1]; }
+    return ogImageDeep(html);   // huge pages (Google News interstitial) put og:image at the END of a massive head
+  }
+  // Cheap whole-document search for an og:image/twitter:image meta when it's past the 80KB head slice.
+  function ogImageDeep(html) {
+    var keys = ["og:image", "twitter:image"], k, i, tag, start, end, c;
+    for (k = 0; k < keys.length; k++) {
+      i = html.indexOf(keys[k]);
+      while (i >= 0) {
+        start = html.lastIndexOf("<meta", i); end = html.indexOf(">", i);
+        if (start >= 0 && end > start) {
+          tag = html.slice(start, end + 1);
+          c = tag.match(/content\s*=\s*["']([^"']+)["']/i);
+          if (c && c[1]) return c[1];
+        }
+        i = html.indexOf(keys[k], i + keys[k].length);
+      }
+    }
     return "";
   }
   function resolveOg(pageUrl) {
@@ -172,14 +189,36 @@
     if (pageUrl in ogCache) return Promise.resolve(ogCache[pageUrl].i);
     return new Promise(function (res) { ogQueue.push({ u: pageUrl, res: res }); pumpOg(); });
   }
+  function ogFrom(text, baseUrl) {
+    var img = extractOg(text);
+    if (img) { try { img = new URL(img, baseUrl).href; } catch (e) { img = ""; } }
+    if (img && !/^https:\/\//i.test(img)) img = "";   // https page can't show http image (mixed content)
+    return img;
+  }
+  // Google News hides the real article behind an encrypted token; its interstitial og:image is just the
+  // generic GN logo (identical for every item). Decode the token via GN's batchexecute endpoint to get the
+  // real article URL, then read THAT page's og:image. Best-effort — returns "" if Google changes the format.
+  function gnDecode(html) {
+    var id = (html.match(/data-n-a-id="([^"]+)"/) || [])[1];
+    var ts = (html.match(/data-n-a-ts="([^"]+)"/) || [])[1];
+    var sg = (html.match(/data-n-a-sg="([^"]+)"/) || [])[1];
+    if (!id || !ts || !sg) return Promise.resolve("");
+    var art = ["garturlreq", [["X", "X", ["X", "X"], null, null, 1, 1, "US:en", null, 1, null, null, null, null, null, 0, 1], "X", "X", 1, [1, 1, 1], 1, 1, null, 0, 0, null, 0], id, ts, sg];
+    var body = "f.req=" + encodeURIComponent(JSON.stringify([[["Fbv4je", JSON.stringify(art), null, "1"]]]));
+    return fetch("https://news.google.com/_/DotsSplashUi/data/batchexecute", { method: "POST", credentials: "omit", headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body: body })
+      .then(function (r) { return r.text(); })
+      .then(function (t) { var m = t.match(/garturlres[^]*?(https?:\/\/[^"\\]+)/); return m ? m[1] : ""; })
+      .catch(function () { return ""; });
+  }
   function pumpOg() {
     while (ogActive < OG_MAX && ogQueue.length) {
       var job = ogQueue.shift(); ogActive++;
       fetchText(job.u).then(function (r) {
-        var img = extractOg(r.text);
-        if (img) { try { img = new URL(img, r.finalUrl).href; } catch (e) { img = ""; } }
-        if (img && !/^https:\/\//i.test(img)) img = "";   // https page can't show http image (mixed content)
-        return img;
+        // GN interstitial: decode to the real article, then read its og:image (never the generic GN logo).
+        if (/news\.google\./i.test(job.u) && /data-n-a-sg=/.test(r.text)) {
+          return gnDecode(r.text).then(function (real) { return real ? fetchText(real).then(function (r2) { return ogFrom(r2.text, r2.finalUrl); }) : ""; });
+        }
+        return ogFrom(r.text, r.finalUrl);
       }).catch(function () { return ""; }).then(function (img) {
         ogCache[job.u] = { i: img || "", ts: Date.now() }; saveOg(); job.res(ogCache[job.u].i); ogActive--; pumpOg();
       });
@@ -477,19 +516,22 @@
         var old = wrap.querySelector(".feed-loadnew"); if (old) old.remove();
         var pill = D.el("button", { "class": "feed-loadnew", text: t("feed.loadNew", { N: String(n) }) });
         // Float the pill to the top of the screen once the feed start is scrolled out of view; clicking it
-        // loads the new items and scrolls back to the start of the news block.
-        if (pillScroll) { window.removeEventListener("scroll", pillScroll); pillScroll = null; }
+        // loads the new items and scrolls back to the start of the news block. capture:true so it fires no
+        // matter which element is the scroller.
+        if (pillScroll) { document.removeEventListener("scroll", pillScroll, true); pillScroll = null; }
         var onScroll = function () {
-          if (!pill.isConnected) { window.removeEventListener("scroll", onScroll); if (pillScroll === onScroll) pillScroll = null; return; }
+          if (!pill.isConnected) { document.removeEventListener("scroll", onScroll, true); if (pillScroll === onScroll) pillScroll = null; return; }
           pill.classList.toggle("floating", wrap.getBoundingClientRect().top < 0);
         };
         pillScroll = onScroll;
-        window.addEventListener("scroll", onScroll, { passive: true });
+        document.addEventListener("scroll", onScroll, { passive: true, capture: true });
         pill.addEventListener("click", function () {
-          window.removeEventListener("scroll", onScroll); if (pillScroll === onScroll) pillScroll = null;
+          document.removeEventListener("scroll", onScroll, true); if (pillScroll === onScroll) pillScroll = null;
           shownKeys = allKeys(); paintResults(resultsFromCache(), maxTs(), true);
-          var y = window.scrollY + wrap.getBoundingClientRect().top - 12;
-          window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+          var cur = window.scrollY || (document.scrollingElement && document.scrollingElement.scrollTop) || 0;
+          var y = Math.max(0, cur + wrap.getBoundingClientRect().top - 12);
+          window.scrollTo({ top: y, behavior: "smooth" });
+          var sc = document.scrollingElement; if (sc && sc.scrollTo) sc.scrollTo({ top: y, behavior: "smooth" });
         });
         wrap.insertBefore(pill, wrap.firstChild);
         onScroll();

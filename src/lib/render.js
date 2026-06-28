@@ -100,7 +100,10 @@
     function renderGrid(state) {
       var grid = document.getElementById("grid");
       grid.innerHTML = "";
-      grid.style.setProperty("--grid-cols", state.settings.grid.columns);
+      // 0 = Auto (intrinsic auto-fit); >0 = pinned column count (advanced override).
+      var cols = state.settings.grid.columns;
+      if (cols > 0) { grid.setAttribute("data-grid", "fixed"); grid.style.setProperty("--grid-cols", cols); }
+      else grid.removeAttribute("data-grid");
       var gid = state.settings.activeGroupId;
       var dials = state.dials.filter(function (d) { return d.groupId === gid && !d.parentId; }).sort(byOrder);
       dials.forEach(function (d) { grid.appendChild(dialTile(d, state)); });
@@ -157,28 +160,29 @@
         img.src = d.icon.value;
       } else if (type === "library") {
         var lib = SD.icons.libraryIcon(state, d.icon.value);
-        img.src = lib ? lib.dataUrl : SD.icons.letterDataUrl(d.title, accent);
+        img.src = lib ? lib.dataUrl : SD.icons.letterDataUrl(d.title, accent, d.url);
       } else if (type === "letter") {
-        img.src = SD.icons.letterDataUrl(d.title, accent);
+        img.src = SD.icons.letterDataUrl(d.title, accent, d.url);
       } else if ((type === "auto" || type === "favicon") && state.settings.tile.autoFavicon && d.url) {
         img.addEventListener("load", function () { fitIcon(img); });
         if (d.icon && d.icon.cachedUrl) {
           img.src = d.icon.cachedUrl;
-          img.addEventListener("error", function () { img.src = SD.icons.letterDataUrl(d.title, accent); }, { once: true });   // cached icon 404'd → letter
+          img.addEventListener("error", function () { img.src = SD.icons.letterDataUrl(d.title, accent, d.url); }, { once: true });   // cached icon 404'd → letter
         } else {
-          img.src = SD.icons.letterDataUrl(d.title || d.url, accent);   // instant placeholder
+          img.src = SD.icons.letterDataUrl(d.title || d.url, accent, d.url);   // instant placeholder
           resolveAndCache(d);   // probe candidates ONCE, cache the first that actually loads
         }
       } else {
-        img.src = SD.icons.letterDataUrl(d.title, accent);
+        img.src = SD.icons.letterDataUrl(d.title, accent, d.url);
       }
       return img;
     }
     function fmtKB(n) { return n < 1024 ? n + " B" : (n / 1024).toFixed(1) + " KB"; }
-    // Small favicons (16–32px) render at native size and look tiny; scale them to fill the tile.
+    // Designer §4.1: don't upscale a small favicon into a blur — keep it native size, centered, on a
+    // tinted chip so it doesn't float. Mark the wrap (not the img) so CSS adds the tint.
     function fitIcon(img) {
-      var w = img.naturalWidth || 0;
-      if (w && w < 40) img.classList.add("dial-ico-fill"); else img.classList.remove("dial-ico-fill");
+      var w = img.naturalWidth || 0, wrap = img.parentNode;
+      if (wrap && wrap.classList) wrap.classList.toggle("is-tiny", w > 0 && w < 32);
     }
     // Probe URLs in priority order via a detached Image; resolve to the FIRST that actually loads (null if
     // none). Each URL is requested at most once — no per-render re-probing, no 404 storms.
@@ -224,14 +228,14 @@
     function setMiniIcon(mi, k, state) {
       var accent = SD.themes.active(state).colors.accent;
       if (k.icon && k.icon.type === "upload" && k.icon.value) { mi.src = k.icon.value; return; }
-      if (k.icon && k.icon.type === "library") { var lib = SD.icons.libraryIcon(state, k.icon.value); mi.src = lib ? lib.dataUrl : SD.icons.letterDataUrl(k.title, accent); return; }
+      if (k.icon && k.icon.type === "library") { var lib = SD.icons.libraryIcon(state, k.icon.value); mi.src = lib ? lib.dataUrl : SD.icons.letterDataUrl(k.title, accent, k.url); return; }
       if (k.url && state.settings.tile.autoFavicon) {
         var cands = SD.icons.faviconCandidates(normalizeUrl(k.url)), i = 0;
-        var tn = function () { mi.src = i < cands.length ? cands[i++] : SD.icons.letterDataUrl(k.title || k.url, accent); };
+        var tn = function () { mi.src = i < cands.length ? cands[i++] : SD.icons.letterDataUrl(k.title || k.url, accent, k.url); };
         mi.addEventListener("error", function () { tn(); });
         tn(); return;
       }
-      mi.src = SD.icons.letterDataUrl(k.title, accent);
+      mi.src = SD.icons.letterDataUrl(k.title, accent, k.url);
     }
 
     function folderTile(d, state) {
@@ -440,6 +444,10 @@
         });
         close();
       });
+      // Enter in the URL/title field saves the dial (like submitting a form).
+      var saveOnEnter = function (e) { if (e.key === "Enter") { e.preventDefault(); save.click(); } };
+      fUrl.addEventListener("keydown", saveOnEnter);
+      fTitle.addEventListener("keydown", saveOnEnter);
     }
 
     // instId -> { sig, card }: reuse a card's live DOM (ticking clocks, focused notes) when unrelated state changed
@@ -659,11 +667,15 @@
             }
           }
         } else {
-          body.appendChild(SD.dom.el("div", { "class": "skeleton w-skel w-skel-" + inst.type, "aria-hidden": "true" }));
+          var skel = function () { SD.dom.clear(body); body.appendChild(SD.dom.el("div", { "class": "skeleton w-skel w-skel-" + inst.type, "aria-hidden": "true" })); };
+          var retryNet = function () { skel(); SD.netWidget.load(SD.store.get(), inst, mod, renderNet).then(renderNet); };
           var renderNet = function (res) {
-            try { mod.render(body, res, instCtx(inst)); widgetUpdated(body, res); card.style.minHeight = ""; }
-            catch (e) { console.warn("[speed-dial] render " + inst.type + ":", e); showErr(body); }
+            try {
+              if (res && res.error) { showErr(body, retryNet); return; }
+              mod.render(body, res, instCtx(inst)); widgetUpdated(body, res); card.style.minHeight = "";
+            } catch (e) { console.warn("[speed-dial] render " + inst.type + ":", e); showErr(body, retryNet); }
           };
+          skel();
           SD.netWidget.load(state, inst, mod, renderNet).then(renderNet);
         }
       } catch (e) {
@@ -742,7 +754,13 @@
       card.appendChild(buildWidgetSettings(inst, instCtx(inst), function () { openWidgetSettings = null; removeCardPanel(card); }));
     }
 
-    function showErr(body) { SD.dom.clear(body); body.appendChild(SD.dom.el("div", { "class": "w-err", text: SD.i18n.t("status.error") })); }
+    // Error state (designer §5): icon + message + Retry, inside the card (not full-screen).
+    function showErr(body, onRetry) {
+      SD.dom.clear(body);
+      var box = SD.dom.el("div", { "class": "w-err" }, [SD.dom.el("span", { text: "⚠ " + SD.i18n.t("status.error") })]);
+      if (onRetry) { var b = SD.dom.el("button", { "class": "btn ghost w-retry", text: SD.i18n.t("status.retry") }); b.addEventListener("click", onRetry); box.appendChild(b); }
+      body.appendChild(box);
+    }
     function fmtClock(ts) { try { return new Date(ts).toLocaleTimeString(SD.i18n.current() || undefined, { hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } }
     function widgetUpdated(body, res) {
       if (!res || !res.ts) return;

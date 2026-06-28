@@ -33,16 +33,47 @@
       return (state.iconLibrary || []).filter(function (i) { return i.id === refId; })[0] || null;
     }
 
-    function letterDataUrl(title, accent) {
+    // First grapheme (emoji/combined/non-Latin aware), uppercased.
+    function firstGrapheme(title) {
+      var t = (title || "").trim();
+      if (!t) return "?";
+      try {
+        if (typeof Intl !== "undefined" && Intl.Segmenter) {
+          var seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+          var first = seg.segment(t)[Symbol.iterator]().next().value;
+          if (first && first.segment) return first.segment.toUpperCase();
+        }
+      } catch (e) { /* fall through */ }
+      var cp = t.codePointAt(0);
+      return String.fromCodePoint(cp).toUpperCase();
+    }
+    function hashStr(s) { var h = 0, i; for (i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return h; }
+    // sRGB relative luminance (0..1) of #rrggbb
+    function luminance(hex) {
+      var m = /^#?([0-9a-f]{6})$/i.exec(hex || ""); if (!m) return 0.5;
+      var n = parseInt(m[1], 16), ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+        v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.4172 * ch[2];
+    }
+    // Letter placeholder: themed chip (accent, deterministically hue-varied per key) with a contrast-checked
+    // glyph (not hardcoded white) and grapheme-aware first character.
+    function letterDataUrl(title, accent, key) {
       var size = 96, c = document.createElement("canvas");
       c.width = c.height = size;
       var x = c.getContext("2d");
-      x.fillStyle = accent || "#38bdf8";
+      var bg = accent || "#38bdf8";
+      // Stable per-domain variation, anchored to the theme accent (rotate hue via canvas filter).
+      var rot = key ? (Math.abs(hashStr(key)) % 60) - 30 : 0;
+      x.save();
+      try { if (rot) x.filter = "hue-rotate(" + rot + "deg)"; } catch (e) { /* unsupported → plain accent */ }
+      x.fillStyle = bg;
       roundRect(x, 0, 0, size, size, 20); x.fill();
-      x.fillStyle = "#ffffff";
+      x.restore();
+      x.fillStyle = luminance(bg) > 0.5 ? "#1f2937" : "#ffffff";   // contrast-aware glyph
       x.font = "600 48px system-ui, sans-serif";
       x.textAlign = "center"; x.textBaseline = "middle";
-      x.fillText(((title || "?").trim()[0] || "?").toUpperCase(), size / 2, size / 2 + 2);
+      x.fillText(firstGrapheme(title), size / 2, size / 2 + 2);
       return c.toDataURL("image/png");
     }
 

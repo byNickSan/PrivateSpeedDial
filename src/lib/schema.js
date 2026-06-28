@@ -40,7 +40,7 @@
           newtabEnabled: null,
           onboarded: false,     // first-run welcome shown once; any dismissal sets true
           activeGroupId: gid,
-          grid: { columns: 6, rows: 3, gap: 16 },
+          grid: { columns: 0, rows: 3, gap: 16 },   // columns 0 = Auto (intrinsic grid); >0 pins a fixed count
           tile: { width: 120, height: 110, radius: 16, autoFavicon: true },
           locale: null,         // UI language: null=auto, else en|ru|cs|fr|de
           region: null,         // news country (SD.regions code): null=auto-detect
@@ -49,6 +49,7 @@
           widgetColWidth: 300,  // px width of left/right widget columns (desktop only; min 300)
           showDials: true,      // central dials grid; off frees space for wider widget columns
           perfOverlay: false,   // fixed top-left tab-memory readout (Chromium performance.memory; "—" elsewhere)
+          density: "comfortable",  // design-system density preset: comfortable | compact (drives --tile-*/icon tokens)
           font: { family: "system-ui, sans-serif", size: 13, labelColor: "", clock: "", notes: "" },
           showLabels: true,
           theme: { activeSchemeId: "nord", mode: "auto" },

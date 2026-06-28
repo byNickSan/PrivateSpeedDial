@@ -2,20 +2,45 @@
 
 :root {
   --bg: #0f172a; --surface: #1e293b; --text: #e2e8f0; --accent: #38bdf8; --border: #334155;
+  --text-muted: color-mix(in srgb, var(--text) 72%, transparent);   /* AA-aware muted text token */
   --font-family: system-ui, sans-serif; --font-size: 13px;
-  --tile-w: 120px; --tile-h: 110px; --tile-radius: 16px; --grid-cols: 6; --grid-gap: 16px;
-  --tile-ar: 1.09; --tile-max: calc(var(--tile-w) * 1.6);
+
+  /* Design-system scales (density-independent) */
+  --sp-4: 4px; --sp-8: 8px; --sp-12: 12px; --sp-16: 16px; --sp-24: 24px; --sp-32: 32px; --sp-48: 48px; --sp-64: 64px;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-pill: 999px;
+  /* Type scale (1.25, base 16). Note: --fs-base 16px on inputs avoids iOS zoom. */
+  --fs-caption: 12px; --fs-ui: 13px; --fs-body: 14px; --fs-base: 16px; --fs-lg: 20px; --fs-xl: 25px; --fs-2xl: 31px;
+  --content-max: 1600px;
+  --focus-ring: 2px solid var(--accent);
+
+  /* Density: comfortable (default). A user's manual layout settings override these via themes.js. */
+  --tile-target: 132px; --tile-cap: 156px; --tile-gap: 20px; --tile-radius: 16px; --tile-pad: 12px;
+  --dial-icon-min: 48px; --dial-icon-k: 50; --dial-icon-max: 96px; --dial-label-fs: 14px;
+  --news-card-min: 320px; --widget-icon: clamp(40px, 30cqw, 88px);
+
+  /* Back-compat aliases (manual overrides still write these in themes.js) */
+  --tile-w: var(--tile-target); --tile-h: 110px; --tile-ar: 1.09; --grid-gap: var(--tile-gap);
   --anim-speed: 180ms; --bg-blur: 0px; --bg-dim: 0; --bg-anim-speed: 14000ms;
 }
+:root[data-density="compact"] {
+  --tile-target: 96px; --tile-cap: 112px; --tile-gap: 12px; --tile-radius: 12px; --tile-pad: 8px;
+  --dial-icon-min: 40px; --dial-icon-k: 52; --dial-icon-max: 72px; --dial-label-fs: 12px;
+  --news-card-min: 260px; --widget-icon: clamp(32px, 30cqw, 64px);
+}
+*:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
 
 * { box-sizing: border-box; }
 /* Critical: [hidden] must always win over component display rules (.banner/.minimal-view set display),
    otherwise a hidden full-screen overlay intercepts every click. */
 [hidden] { display: none !important; }
-html, body { height: 100%; margin: 0; max-width: 100%; overflow-x: hidden; }
+/* html is the viewport scroller (window.scrollY). body uses min-height (NOT height:100%) so it grows with
+   content instead of becoming its own overflow-y:auto scroll container — that quirk (from overflow-x:hidden
+   + fixed height) broke window scroll events, the back-to-top button and the floating "new" pill. */
+html { height: 100%; margin: 0; max-width: 100%; overflow-x: hidden; }
 body {
+  min-height: 100%; margin: 0; max-width: 100%; overflow-x: hidden;
   font-family: var(--font-family); font-size: var(--font-size); color: var(--text);
-  background: var(--bg); overflow-x: hidden;
+  background: var(--bg);
 }
 
 /* Scrollbars — themed for both light and dark via CSS variables, everywhere they appear. */
@@ -75,13 +100,13 @@ body.is-locked .widget-title { cursor: default; }
 #main { display: flex; gap: 22px; padding: 18px 28px 40px; align-items: flex-start; }
 #grid-wrap { flex: 1; min-width: 0; }
 #grid {
-  display: grid; grid-template-columns: repeat(var(--grid-cols), minmax(0, 1fr));
-  gap: var(--grid-gap); justify-content: start; min-width: 0;
-  /* Exactly the configured number of columns, each stretching to fill the available width so tiles grow
-     on large screens; capped via max-width so a tile never exceeds --tile-max. Narrow screens fall back
-     to auto-fill column counts in the media queries below. */
-  max-width: calc(var(--grid-cols) * var(--tile-max) + (var(--grid-cols) - 1) * var(--grid-gap));
+  /* Designer spec (§3/§7): intrinsic auto-fit; tile capped at --tile-cap and centered in its 1fr cell,
+     so extra width goes to the gap, not into ballooning tiles. Capped + centered at --content-max. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--tile-target), 1fr));
+  gap: var(--tile-gap); min-width: 0; max-width: var(--content-max); margin-inline: auto;
 }
+/* Advanced override: user pinned a fixed column count in settings. */
+#grid[data-grid="fixed"] { grid-template-columns: repeat(var(--grid-cols), minmax(0, 1fr)); }
 #grid.anim-in { animation: group-in var(--anim-speed) ease; }
 body[data-group-anim="slide"] #grid.anim-in { animation: group-slide var(--anim-speed) ease; }
 body[data-group-anim="none"] #grid.anim-in { animation: none; }
@@ -90,21 +115,24 @@ body[data-group-anim="none"] #grid.anim-in { animation: none; }
 
 /* Dial tiles */
 .dial {
-  position: relative; width: 100%; max-width: var(--tile-max);
-  min-height: var(--tile-h); container-type: inline-size;
+  position: relative; width: 100%; max-width: var(--tile-cap); margin-inline: auto;
+  min-height: var(--tile-h); padding: var(--tile-pad); container-type: inline-size;
   background: var(--tile-color, var(--surface)); border: 1px solid var(--border);
   border-radius: var(--tile-radius); display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 8px; text-decoration: none; color: var(--text);
+  align-items: center; justify-content: center; gap: var(--sp-8); text-decoration: none; color: var(--text);
   cursor: pointer; transition: transform var(--anim-speed) ease, box-shadow var(--anim-speed) ease, outline-color var(--anim-speed);
-  outline: 2px solid transparent; outline-offset: 2px;
 }
-.dial:focus-visible { outline-color: var(--accent); }
-/* Icon scales with the tile (container query units) so dials look right when they grow on large screens. */
-.dial-ico-wrap { width: clamp(40px, 42cqw, 80px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
-.dial-ico { max-width: 100%; max-height: 100%; border-radius: 10px; }
-.dial-ico.dial-ico-fill { width: 100%; height: 100%; max-width: none; max-height: none; object-fit: contain; }
-.dial-label { color: var(--label-color, var(--text)); font-size: var(--font-size); text-align: center; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dial-edit { position: absolute; top: 4px; right: 4px; opacity: 0; background: rgba(0,0,0,.4); color: #fff; border: none; border-radius: 6px; cursor: pointer; width: 22px; height: 22px; }
+/* Icon tracks the tile width (cqw) with a raised cap; the tile (not the icon) is what's capped, so the
+   icon/tile ratio stays ~50% at any viewport — fixes "tiny icons on wide/tablet screens". */
+.dial-ico-wrap { width: clamp(var(--dial-icon-min), calc(var(--dial-icon-k) * 1cqw), var(--dial-icon-max)); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; padding: 8%; box-sizing: border-box; border-radius: var(--r-md); }
+/* Designer §4.1: icon fills the chip (object-fit:contain keeps aspect) so it stays large at any screen/tile
+   size. ONLY a genuinely tiny source (<32px, rare — resolver prefers >=64 / 128px service) stays at native
+   size, centered on a tinted chip, instead of upscaling into a blur. */
+.dial-ico { width: 100%; height: 100%; object-fit: contain; border-radius: var(--r-md); }
+.dial-ico-wrap.is-tiny { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.dial-ico-wrap.is-tiny .dial-ico { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+.dial-label { color: var(--label-color, var(--text)); font-size: var(--dial-label-fs); text-align: center; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dial-edit { position: absolute; top: 4px; right: 4px; opacity: 0; background: rgba(0,0,0,.4); color: #fff; border: none; border-radius: 6px; cursor: pointer; width: 28px; height: 28px; }
 .dial:hover .dial-edit { opacity: 1; }
 .add-dial { font-size: 28px; opacity: .6; }
 .dial.folder { font: inherit; }
@@ -167,7 +195,9 @@ body.no-dials #grid { display: none; }
 .widget-settings .set-row > .pair, .widget-settings .set-row > a, .widget-settings .set-row > button { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .widget-settings input, .widget-settings select { max-width: 200px; box-sizing: border-box; }
 .w-row { display: flex; justify-content: space-between; padding: 2px 0; }
-.w-cache, .w-err { font-size: 11px; opacity: .6; margin-top: 6px; }
+.w-cache { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.w-err { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: var(--fs-body); color: var(--text-muted); padding: 8px 2px; }
+.w-retry { align-self: flex-start; }
 /* Bookmark-to-dial drop: highlight the whole grid while a bookmark is dragged over it. */
 #grid.bm-drop-active { outline: 3px dashed var(--accent, #0ea5e9); outline-offset: 8px; border-radius: 16px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
 /* Bookmarks widget */
@@ -214,11 +244,11 @@ body.no-dials #grid { display: none; }
 /* News feed widget (Discover-like horizontal strip) */
 #widgets-bottom .widget-card.w-feed { flex-basis: 100%; max-width: 100%; }
 .feed-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
-.feed-grid { display: grid; grid-template-columns: repeat(var(--feed-cols, 3), minmax(0, 1fr)); gap: 12px; }
-/* Responsive column cap so a news card preview always fits: never more than the configured count, but
-   fewer on narrower viewports. (<=600px collapses to 1 column in the mobile block below.) */
-@media (max-width: 1220px) { .feed-grid { grid-template-columns: repeat(min(var(--feed-cols, 3), 3), minmax(0, 1fr)); } }
-@media (max-width: 900px)  { .feed-grid { grid-template-columns: repeat(min(var(--feed-cols, 3), 2), minmax(0, 1fr)); } }
+/* Intrinsic: column count derives from width ("fits by preview") — same model as the dial grid. */
+.feed-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--news-card-min), 1fr)); gap: var(--sp-16); }
+#widgets-bottom .widget-card.w-feed .feed-grid { max-width: var(--content-max); margin-inline: auto; }
+/* Advanced override: user pinned a fixed column count. */
+.feed-grid[data-grid="fixed"] { grid-template-columns: repeat(var(--feed-cols, 3), minmax(0, 1fr)); }
 .feed-card { min-width: 0; container-type: inline-size; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--text); text-decoration: none; }
 .feed-card:hover { border-color: var(--accent); }
 .feed-media { position: relative; width: 100%; height: clamp(150px, 60cqw, 360px); border-radius: 8px; overflow: hidden; margin-bottom: 4px; background: var(--surface); }
@@ -260,7 +290,7 @@ body.no-dials #grid { display: none; }
 .ai-send { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--accent); cursor: pointer; padding: 4px; display: inline-flex; align-items: center; }
 .ai-send:hover { opacity: .75; }
 /* Brand footer — static, bottom-centred (in page flow, scrolls with content). */
-.footer { display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 11px; opacity: .45; color: var(--text); padding: 14px 0 26px; }
+.footer { display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); padding: 14px 0 26px; }
 .footer svg { opacity: .75; }
 /* Clickable date/time chip + its popover */
 .dt-chip { background: color-mix(in srgb, var(--surface) 80%, transparent); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; cursor: pointer; font-size: 12px; }
@@ -270,13 +300,15 @@ body.no-dials #grid { display: none; }
 .dt-pop input { flex: 1; }
 /* Touch devices (Android): no hover, so keep row actions and the add-widget control reachable. */
 @media (pointer: coarse) {
-  /* No hover on touch — make hover-only controls always visible and finger-sized. */
+  /* No hover on touch — make hover-only controls always visible and finger-sized (WCAG 44x44). */
   .bm-todial, .bm-edit-btn, .bm-fact, .dial-edit, .widget-gear, .feed-filter-chip { opacity: 1; }
   .widget-add { opacity: .8; }
-  .bm-item, .ai-btn, .feed-card, .add-menu-item { min-height: 40px; }
-  .bm-item { padding: 8px 6px; }
-  .widget-gear { font-size: 22px; padding: 6px 10px; }
-  .dial-edit { width: 32px; height: 32px; opacity: 1; }
+  .bm-item, .ai-btn, .feed-card, .add-menu-item { min-height: 44px; }
+  .bm-item { padding: 10px 6px; }
+  .widget-gear { font-size: 22px; padding: 8px 12px; }
+  .dial-edit { width: 44px; height: 44px; opacity: 1; }
+  .icon-btn, .note-del, .task-del, .cal-ev-del, .se-dot { min-width: 44px; min-height: 44px; }
+  .btn, .tab, .feed-more, .feed-filter-chip, .feed-loadnew { min-height: 44px; }
   .feed-filter-chip { padding: 6px 14px; font-size: 13px; }
 }
 /* Skeleton loader: reserves space and shimmers diagonally while a widget loads. */
@@ -319,7 +351,7 @@ body.no-dials #grid { display: none; }
 /* Adaptive sizing: icons + temperature scale with the widget column width (container queries), so they
    aren't tiny on a wide tablet column. The inline width/height the JS sets on the SVG is the floor. */
 .w-weather { container-type: inline-size; }
-.w-head .wi { width: clamp(30px, 22cqw, 64px); height: auto; }
+.w-head .wi { width: var(--widget-icon); height: auto; }
 .w-compact .wi { width: clamp(22px, 12cqw, 44px); height: auto; }
 .w-htc .wi { width: clamp(56px, 32cqw, 120px); height: auto; }
 .w-day .wi { width: clamp(24px, 9cqw, 48px); height: auto; }
@@ -383,7 +415,7 @@ body.no-dials #grid { display: none; }
 .radar-pickable { cursor: crosshair; }
 .radar-time { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 48px; text-align: center; }
 .radar-zoom { font-variant-numeric: tabular-nums; font-size: 12px; opacity: .65; min-width: 26px; text-align: center; }
-.radar-attrib { font-size: 10px; opacity: .55; text-align: right; }
+.radar-attrib { font-size: 10px; color: var(--text-muted); text-align: right; }
 .notes-area { display: block; width: 100%; min-height: 0; overflow: hidden; resize: none; background: var(--bg); color: var(--text); border: none; border-radius: 0; padding: 6px 24px 6px 8px; line-height: 1.35; font: inherit; font-family: var(--notes-font, inherit); }
 .note-item { position: relative; }
 .note-item + .note-item { border-top: 1px solid var(--border); }
@@ -515,6 +547,7 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .modal-box h3 { margin-top: 0; }
 .dial-editor label { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
 .settings { text-align: left; }
+.settings-search { width: 100%; box-sizing: border-box; margin: 4px 0 8px; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text); font: inherit; }
 .settings .set-row { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 14px; margin: 7px 0; flex-wrap: wrap; }
 .settings .set-row > span { flex: 1 1 120px; min-width: 0; }
 .settings .set-row > select, .settings .set-row > input[type=text], .settings .set-row > input[type=number], .settings .set-row > input[type=url] { flex: 0 1 150px; max-width: 150px; min-width: 0; box-sizing: border-box; }
@@ -545,6 +578,7 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 #search { margin: 4px 0 22px; }
 .search-wrap { position: relative; width: 100%; max-width: 600px; margin: 0 auto; box-sizing: border-box; }
 .search-bar { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 6px 10px; }
+.search-bar:focus-within { outline: var(--focus-ring); outline-offset: 2px; }   /* input keeps outline:none; ring shows on the bar */
 .search-engine-btn { display: flex; align-items: center; gap: 6px; background: transparent; border: none; color: var(--text); cursor: pointer; font: inherit; padding: 4px 6px; border-radius: 8px; }
 .search-engine-btn:hover { background: color-mix(in srgb, var(--text) 12%, transparent); }
 .se-dot { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #001; font-weight: 700; font-size: 12px; }
@@ -573,18 +607,15 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 /* Phones: fluid grid that always fits the viewport (overrides the inline column count),
    smaller tiles, wrapped top bar, full-width search and stacked settings rows. */
 @media (max-width: 600px) {
-  :root { --tile-h: 92px; --grid-gap: 10px; }
+  /* Intrinsic grid reduces columns by width on its own; per designer §3 breakpoints handle layout shifts
+     and page padding only, not tile sizing. Keep just a tighter gap + min-height here. */
+  :root { --tile-h: 96px; --tile-gap: 12px; }
   #topbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
   #theme-toggle { display: none; }
   #tabs { gap: 4px; }
   .tab { padding: 5px 10px; }
   #main { padding: 10px 0 28px; gap: 14px; }   /* no side gutter — widgets go edge-to-edge */
   #grid-wrap { padding: 0 12px; }              /* search + dials/groups keep their inset */
-  #grid { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)) !important; justify-content: stretch; }
-  .dial { width: auto; min-width: 0; height: var(--tile-h); }
-  .dial-ico-wrap { width: 40px; height: 40px; }
-  .dial-ico { max-width: 40px; max-height: 40px; }
-  .dial-label { font-size: 12px; }
   .dial-edit { opacity: 1; }                 /* no hover on touch — keep edit reachable */
   .search-wrap { width: 100%; max-width: none; margin: 0; }
   .modal-box { width: 96vw; padding: 16px; max-height: 90vh; }
@@ -599,22 +630,17 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
   }
   .w-feed { padding: 12px 0; border-radius: 0; border-left: none; border-right: none; }
   .w-feed .widget-title { padding: 0 12px; }
-  .feed-grid { grid-template-columns: 1fr !important; gap: 16px; padding: 0; }
   .feed-card { padding: 0 0 10px; border-radius: 0; border-left: none; border-right: none; overflow: hidden; }
   .feed-media { border-radius: 0; margin-bottom: 6px; }
   .feed-card-title, .feed-card-src { padding: 0 12px; }
   .bm-body { max-height: 300px; }
 }
 
-/* Very small phones: tighter tiles. */
-@media (max-width: 380px) {
-  #grid { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)) !important; }
-  :root { --tile-h: 84px; }
-}
-
 @media (prefers-reduced-motion: reduce) {
   #bg.bg-animated { animation: none; }
-  .dial { transition: none; }
+  .dial, .toast { transition: none; }
+  .dial:hover { transform: none !important; box-shadow: none; }
+  .modal-box.zoom-in, #grid.anim-in { animation: none; }
 }
 
 /* Region/language picker with bundled flag SVGs */
@@ -659,7 +685,7 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .icon-variant.sel .icon-variant-check { display: block; }
 
 /* Feed: "load new" pill (replaces the manual refresh button — auto-cached 5 min, offer fresh on demand) */
-.feed-loadnew { display: block; width: 100%; padding: 8px 10px; margin: 0 0 10px; background: color-mix(in srgb, var(--accent) 20%, var(--surface)); color: var(--text); border: 1px solid var(--accent); border-radius: 10px; cursor: pointer; font: inherit; font-weight: 600; }
+.feed-loadnew { display: block; width: fit-content; max-width: 100%; padding: 7px 16px; margin: 0 auto 10px; background: color-mix(in srgb, var(--accent) 20%, var(--surface)); color: var(--text); border: 1px solid var(--accent); border-radius: var(--r-pill); cursor: pointer; font: inherit; font-weight: 600; }
 .feed-loadnew:hover { background: color-mix(in srgb, var(--accent) 30%, var(--surface)); }
 
 /* Radar: data-loading overlay (top-left, like an in-game FPS counter) */

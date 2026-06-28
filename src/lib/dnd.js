@@ -38,6 +38,6 @@
       });
     }
 
-    return { attach: attach };
+    return { attach: attach, reorder: reorder };
   })();
 })();

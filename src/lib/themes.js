@@ -39,12 +39,25 @@
       r.setProperty("--font-size", state.settings.font.size + "px");
       if (state.settings.font.labelColor) r.setProperty("--label-color", state.settings.font.labelColor);
       else r.removeProperty("--label-color");
-      r.setProperty("--tile-radius", state.settings.tile.radius + "px");
-      r.setProperty("--tile-w", state.settings.tile.width + "px");
+      r.setProperty("--text-muted", "color-mix(in srgb, " + c.text + " 72%, transparent)");
+      r.setProperty("--content-max", (state.settings.contentMax || 1600) + "px");
       r.setProperty("--tile-h", state.settings.tile.height + "px");
-      r.setProperty("--tile-ar", (state.settings.tile.width / state.settings.tile.height) || 1);
-      r.setProperty("--grid-cols", state.settings.grid.columns);
-      r.setProperty("--grid-gap", state.settings.grid.gap + "px");
+      r.setProperty("--grid-cols", state.settings.grid.columns || 6);
+      // Density (CSS :root[data-density]) provides the base tile/gap/radius. Manual layout settings are an
+      // ADVANCED override: apply them only when they differ from the schema default, else fall back to density.
+      var def = defSettings();
+      ov(r, "--tile-radius", state.settings.tile.radius, def.tile.radius, "px");
+      ov(r, "--tile-gap", state.settings.grid.gap, def.grid.gap, "px");
+      if (state.settings.tile.width !== def.tile.width) {
+        r.setProperty("--tile-target", state.settings.tile.width + "px");
+        r.setProperty("--tile-cap", state.settings.tile.width + "px");   // fixed-size tile (old behavior)
+      } else { r.removeProperty("--tile-target"); r.removeProperty("--tile-cap"); }
+    }
+    var _def = null;
+    function defSettings() { return _def || (_def = SD.schema.defaults().settings); }
+    // setProperty when value != default, else removeProperty (fall back to density token)
+    function ov(r, name, val, def, unit) {
+      if (val != null && val !== def) r.setProperty(name, val + (unit || "")); else r.removeProperty(name);
     }
 
     return { apply: apply, find: find, active: active };
