@@ -66,6 +66,8 @@
   "settings.keyboardNav": "Navigace šipkami",
   "settings.section.theme": "Barevné schéma",
   "settings.themeMode": "Režim motivu",
+  "settings.darkScheme": "Tmavé schéma",
+  "settings.lightScheme": "Světlé schéma",
   "settings.scheme": "Barevné schéma",
   "theme.auto": "Podle systému",
   "theme.light": "Světlý",

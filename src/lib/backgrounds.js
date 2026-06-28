@@ -49,7 +49,7 @@
     function autoImageUrl(ai) {
       if (ai.cache && ai.cache.url && ai.cache.bucket === bucket(ai)) return ai.cache.url;
       if (ai.provider === "custom" && ai.custom && ai.custom.endpoint) return ai.custom.endpoint;
-      var p = AUTO_PROVIDERS[ai.provider] || AUTO_PROVIDERS.picsum;
+      var p = AUTO_PROVIDERS[ai.provider] || AUTO_PROVIDERS.loremflickr;   // picsum is 403 in some regions (RF)
       return p.url(ai);
     }
 

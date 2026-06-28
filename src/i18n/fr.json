@@ -66,6 +66,8 @@
   "settings.keyboardNav": "Navigation au clavier",
   "settings.section.theme": "Schéma de couleurs",
   "settings.themeMode": "Mode du thème",
+  "settings.darkScheme": "Thème sombre",
+  "settings.lightScheme": "Thème clair",
   "settings.scheme": "Schéma de couleurs",
   "theme.auto": "Selon le système",
   "theme.light": "Clair",

@@ -82,7 +82,7 @@ body.tab-hidden #bg.bg-animated { animation-play-state: paused; }
 .w-key-help:hover { text-decoration: underline; }
 #scroll-top { position: fixed; right: 18px; bottom: 18px; z-index: 50; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 85%, transparent); color: var(--text); font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.3); backdrop-filter: blur(6px); }
 #scroll-top[hidden] { display: none; }
-#scroll-top:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+#scroll-top:hover { background: var(--accent); color: var(--on-accent, #fff); border-color: var(--accent); }
 .feed-loadnew.floating { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 51; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 .sync-status.offline { color: #fbbf24; }
 .icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 36px; height: 36px; cursor: pointer; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; }
@@ -118,6 +118,7 @@ body[data-group-anim="none"] #grid.anim-in { animation: none; }
   position: relative; width: 100%; max-width: var(--tile-cap); margin-inline: auto;
   min-height: var(--tile-h); padding: var(--tile-pad); container-type: inline-size;
   background: var(--tile-color, var(--surface)); border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,.10);   /* keeps tiles defined on light themes where the border is faint */
   border-radius: var(--tile-radius); display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: var(--sp-8); text-decoration: none; color: var(--text);
   cursor: pointer; transition: transform var(--anim-speed) ease, box-shadow var(--anim-speed) ease, outline-color var(--anim-speed);
@@ -131,7 +132,7 @@ body[data-group-anim="none"] #grid.anim-in { animation: none; }
 .dial-ico { width: 100%; height: 100%; object-fit: contain; border-radius: var(--r-md); }
 .dial-ico-wrap.is-tiny { background: color-mix(in srgb, var(--text) 8%, transparent); }
 .dial-ico-wrap.is-tiny .dial-ico { width: auto; height: auto; max-width: 100%; max-height: 100%; }
-.dial-label { color: var(--label-color, var(--text)); font-size: var(--dial-label-fs); text-align: center; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dial-label { color: var(--label-color, var(--tile-text, var(--text))); font-size: var(--dial-label-fs); text-align: center; max-width: 92%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dial-edit { position: absolute; top: 4px; right: 4px; opacity: 0; background: rgba(0,0,0,.4); color: #fff; border: none; border-radius: 6px; cursor: pointer; width: 28px; height: 28px; }
 .dial:hover .dial-edit { opacity: 1; }
 .add-dial { font-size: 28px; opacity: .6; }
@@ -208,8 +209,16 @@ body.no-dials #grid { display: none; }
 .bm-collapse { background: none; border: none; color: inherit; cursor: pointer; font-size: 12px; padding: 0 2px; }
 .bm-bar-label { flex: 1; }
 .bm-bar-spacer { flex: 1; }
-.bm-help { cursor: help; opacity: .5; border: 1px solid var(--border); border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
-.bm-help:hover { opacity: 1; }
+.bm-help { position: relative; cursor: help; opacity: .5; border: 1px solid var(--border); border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+.bm-help:hover, .bm-help:focus-visible { opacity: 1; }
+/* Real (styled, instant) tooltip instead of the slow native title attribute. */
+.bm-help::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 6px 9px; font-size: var(--fs-caption); line-height: 1.35; white-space: normal; width: max-content; max-width: 220px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.32); opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none; z-index: 60; text-align: left;
+}
+.bm-help:hover::after, .bm-help:focus-visible::after { opacity: 1; visibility: visible; }
 .bm-body { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow: auto; }
 .bm-enable { align-self: flex-start; }
 .bm-empty { font-size: 12px; opacity: .6; }
@@ -444,7 +453,7 @@ body.no-dials #grid { display: none; }
 .cal-cell.has-ev { box-shadow: inset 0 -3px 0 var(--accent); }
 .cal-cell.today { outline: 2px solid var(--accent); outline-offset: -2px; }
 /* Selected day: readable text on the accent fill regardless of theme. */
-.cal-cell.selected { background: var(--accent); color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.55); }
+.cal-cell.selected { background: var(--accent); color: var(--on-accent, #fff); font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.55); }
 .cal-events { margin: 8px 0; }
 .cal-ev { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
 .cal-ev b { flex: 1; }
@@ -501,7 +510,9 @@ body.no-dials #grid { display: none; }
 .clock-face.has-bg { background: color-mix(in srgb, var(--surface) 70%, transparent); }
 .clock-face.has-border { border: 1px solid var(--border); }
 /* Nixie clock: warm glowing tubes on black, sitting on a grey panel for the whole clock area. */
-.clock-face[data-style="nixie"] { background: #2a2d33; border-radius: 12px; padding: 12px 14px; }
+/* Nixie tubes need a non-light backdrop to glow. Grey device panel, lighter in the centre (radial gradient)
+   for a 3D/volume look — not flat black — on every theme. */
+.clock-face[data-style="nixie"] { background: radial-gradient(120% 130% at 50% 42%, #4a505b 0%, #363b44 45%, #23272e 100%); border: 1px solid #1a1d23; box-shadow: inset 0 1px 3px rgba(255,255,255,.10), inset 0 -3px 12px rgba(0,0,0,.5); border-radius: var(--r-md); padding: 12px 14px; }
 .clock-face[data-style="nixie"] .clock-label { color: #d4dae3; }
 /* Nixie fills the widget width (container query); everything below sizes in em so it scales. */
 .nixie { display: inline-flex; gap: .1em; align-items: center; justify-content: center; width: 100%; font-size: clamp(18px, 14cqw, 64px); }
@@ -531,12 +542,12 @@ body.no-dials #grid { display: none; }
 .banner-text { display: flex; flex-direction: column; gap: 3px; }
 body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .minimal-view { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #001; padding: 10px 18px; border-radius: 10px; opacity: 0; transition: all .25s; z-index: 1000; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: var(--on-accent, #fff); padding: 10px 18px; border-radius: 10px; opacity: 0; transition: all .25s; z-index: 1000; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* Buttons / rows */
 .btn { font: inherit; cursor: pointer; border-radius: 9px; padding: 7px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
-.btn.primary { background: var(--accent); color: #001; border-color: transparent; }
+.btn.primary { background: var(--accent); color: var(--on-accent, #fff); border-color: transparent; }
 .btn.ghost { background: transparent; }
 .row { display: flex; gap: 8px; align-items: center; }
 .row.end { justify-content: flex-end; }
@@ -581,7 +592,7 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .search-bar:focus-within { outline: var(--focus-ring); outline-offset: 2px; }   /* input keeps outline:none; ring shows on the bar */
 .search-engine-btn { display: flex; align-items: center; gap: 6px; background: transparent; border: none; color: var(--text); cursor: pointer; font: inherit; padding: 4px 6px; border-radius: 8px; }
 .search-engine-btn:hover { background: color-mix(in srgb, var(--text) 12%, transparent); }
-.se-dot { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #001; font-weight: 700; font-size: 12px; }
+.se-dot { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); font-weight: 700; font-size: 12px; }
 .se-icon { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; }
 .se-private { margin-left: auto; width: 15px; height: 15px; object-fit: contain; border-radius: 3px; opacity: .9; }
 .se-name { font-size: 12px; opacity: .85; }
@@ -593,7 +604,9 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .search-menu-item.sel { color: var(--accent); }
 
 /* Tablets / small windows: stack widgets below the grid. */
-@media (max-width: 920px) {
+/* Two 300px widget columns squeeze the central dials well before 920px, so switch to the stacked
+   (phone-like) layout as soon as it's narrow — widgets go full-width below the dials. */
+@media (max-width: 1100px) {
   #main { flex-direction: column; align-items: stretch; }   /* stretch children to full width (fixes search width) */
   #grid-wrap { order: 1; }              /* search + dials first; columns stack before they overlap */
   #widgets-left { order: 2; }
@@ -681,7 +694,7 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .icon-variant { position: relative; width: 46px; height: 46px; padding: 5px; background: var(--bg); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .icon-variant img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .icon-variant.sel { border-color: var(--accent); }
-.icon-variant-check { display: none; position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+.icon-variant-check { display: none; position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); font-size: 11px; line-height: 18px; text-align: center; }
 .icon-variant.sel .icon-variant-check { display: block; }
 
 /* Feed: "load new" pill (replaces the manual refresh button — auto-cached 5 min, offer fresh on demand) */

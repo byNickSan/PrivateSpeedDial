@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   SD.schema = (function () {
-    var VERSION = 2;
+    var VERSION = 3;
 
     function uid() {
       return Date.now().toString(36) + Math.floor(performance.now() * 1000 % 1e6).toString(36) +
@@ -19,9 +19,9 @@
     }
 
     var BUILTIN_SCHEMES = [
-      { id: "nord", name: "Nord", builtin: true, dark: true, colors: { bg: "#2e3440", surface: "#3b4252", text: "#e5e9f0", accent: "#88c0d0", border: "#434c5e" } },
+      { id: "nord", name: "Nord", builtin: true, dark: true, colors: { bg: "#2e3440", surface: "#3b4252", text: "#e5e9f0", accent: "#5e81ac", border: "#434c5e" } },
       { id: "midnight", name: "Graphite", builtin: true, dark: true, colors: { bg: "#16181d", surface: "#202329", text: "#e6e8eb", accent: "#60a5fa", border: "#2c2f36" } },
-      { id: "paper", name: "Paper", builtin: true, dark: false, colors: { bg: "#eceef1", surface: "#ffffff", text: "#1f2937", accent: "#2563eb", border: "#d9dce1" } },
+      { id: "paper", name: "Paper", builtin: true, dark: false, colors: { bg: "#eef1f4", surface: "#ffffff", text: "#27313f", accent: "#3a63b5", border: "#dde2e8" } },
       { id: "forest", name: "Forest", builtin: true, dark: true, colors: { bg: "#0d1f18", surface: "#143025", text: "#d1fae5", accent: "#34d399", border: "#1f3d31" } },
       { id: "grape", name: "Grape", builtin: true, dark: true, colors: { bg: "#1a1226", surface: "#2a1d3d", text: "#ede9fe", accent: "#a78bfa", border: "#3b2a52" } },
       { id: "ocean", name: "Ocean", builtin: true, dark: true, colors: { bg: "#0b1f2a", surface: "#10303f", text: "#d6eef7", accent: "#22d3ee", border: "#1c3a4a" } },
@@ -29,7 +29,15 @@
       { id: "amber", name: "Amber", builtin: true, dark: true, colors: { bg: "#1c1709", surface: "#2a230f", text: "#f7eed8", accent: "#f59e0b", border: "#3c3318" } },
       { id: "sand", name: "Sand", builtin: true, dark: false, colors: { bg: "#f5efe6", surface: "#fffdf8", text: "#3a342b", accent: "#b45309", border: "#e7ddcd" } },
       { id: "rose", name: "Rose", builtin: true, dark: false, colors: { bg: "#fdf2f5", surface: "#ffffff", text: "#3f2a32", accent: "#e11d48", border: "#f3d9e1" } },
-      { id: "mint", name: "Mint", builtin: true, dark: false, colors: { bg: "#eef6f1", surface: "#ffffff", text: "#1f2d28", accent: "#0d9488", border: "#d3e8df" } }
+      { id: "mint", name: "Mint", builtin: true, dark: false, colors: { bg: "#eef6f1", surface: "#ffffff", text: "#1f2d28", accent: "#0d9488", border: "#d3e8df" } },
+      { id: "dracula", name: "Dracula", builtin: true, dark: true, colors: { bg: "#282a36", surface: "#343746", text: "#f8f8f2", accent: "#bd93f9", border: "#44475a" } },
+      { id: "tokyo", name: "Tokyo Night", builtin: true, dark: true, colors: { bg: "#1a1b26", surface: "#24283b", text: "#c0caf5", accent: "#7aa2f7", border: "#2f334d" } },
+      { id: "gruvbox", name: "Gruvbox", builtin: true, dark: true, colors: { bg: "#282828", surface: "#3c3836", text: "#ebdbb2", accent: "#fabd2f", border: "#504945" } },
+      { id: "solarizedDark", name: "Solarized Dark", builtin: true, dark: true, colors: { bg: "#002b36", surface: "#073642", text: "#93a1a1", accent: "#268bd2", border: "#0a4b59" } },
+      { id: "mocha", name: "Catppuccin Mocha", builtin: true, dark: true, colors: { bg: "#1e1e2e", surface: "#313244", text: "#cdd6f4", accent: "#89b4fa", border: "#45475a" } },
+      { id: "onedark", name: "One Dark", builtin: true, dark: true, colors: { bg: "#282c34", surface: "#21252b", text: "#abb2bf", accent: "#61afef", border: "#3b4048" } },
+      { id: "carbon", name: "Carbon", builtin: true, dark: true, colors: { bg: "#0d1117", surface: "#161b22", text: "#c9d1d9", accent: "#58a6ff", border: "#30363d" } },
+      { id: "solarizedLight", name: "Solarized Light", builtin: true, dark: false, colors: { bg: "#fdf6e3", surface: "#ffffff", text: "#586e75", accent: "#268bd2", border: "#eee8d5" } }
     ];
 
     function defaults() {
@@ -52,13 +60,13 @@
           density: "comfortable",  // design-system density preset: comfortable | compact (drives --tile-*/icon tokens)
           font: { family: "system-ui, sans-serif", size: 13, labelColor: "", clock: "", notes: "" },
           showLabels: true,
-          theme: { activeSchemeId: "nord", mode: "auto" },
+          theme: { activeSchemeId: "nord", darkSchemeId: "nord", lightSchemeId: "paper", mode: "auto" },
           background: {
             type: "gradient",
             gradient: { preset: "theme", stops: ["#1e3a8a", "#9333ea", "#0ea5e9"], angle: 160, animated: false, animSpeedMs: 14000 },
             color: "",
             image: { dataUrl: "" },
-            autoImage: { enabled: false, provider: "picsum", apiKey: "", query: "", intervalMin: 30, cache: null },
+            autoImage: { enabled: false, provider: "loremflickr", apiKey: "", query: "", intervalMin: 30, cache: null },
             blur: 0, dim: 0
           },
           animation: { hover: "scale", speedMs: 180, groupSwitch: "fade", keyboardNav: true },
@@ -132,8 +140,15 @@
       return s;
     }
 
+    // v3: a former editor bug force-saved the default dark tile color (#1e293b) on dials the user never
+    // colored, making them black (unreadable) in light themes. Clear it so those dials follow the theme.
+    function migrateV3(s) {
+      (s.dials || []).forEach(function (d) { if (d.color === "#1e293b") d.color = ""; });
+      return s;
+    }
+
     // migration ladder; each entry: { to: N, up(state) -> state }
-    var MIGRATIONS = [{ to: 2, up: migrateV2 }];
+    var MIGRATIONS = [{ to: 2, up: migrateV2 }, { to: 3, up: migrateV3 }];
 
     function migrate(state) {
       if (!state || typeof state !== "object") return defaults();
@@ -147,6 +162,10 @@
       }
       var merged = merge(defaults(), state);
       if (Array.isArray(merged.widgetInstances)) merged.widgetInstances.forEach(fillInstanceDefaults);
+      // Always refresh built-in schemes from code (so palette tweaks + newly added schemes reach existing
+      // users), keeping any user-made custom schemes.
+      var custom = (merged.schemes || []).filter(function (s) { return !s.builtin; });
+      merged.schemes = BUILTIN_SCHEMES.slice().concat(custom);
       return merged;
     }
 

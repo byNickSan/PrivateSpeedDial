@@ -260,7 +260,7 @@
     bar.appendChild(D.el("span", { "class": "bm-collapse", text: cfg.collapsed ? "▸" : "▾" }));
     bar.appendChild(D.el("span", { "class": "bm-bar-label", text: t("widget.bookmarks") }));
     bar.appendChild(D.el("span", { "class": "bm-bar-spacer" }));
-    var help = D.el("span", { "class": "bm-help", text: "?", title: t("bookmarks.dragHint") });
+    var help = D.el("span", { "class": "bm-help", text: "?", "data-tip": t("bookmarks.dragHint"), "aria-label": t("bookmarks.dragHint"), tabindex: "0", role: "button" });
     help.addEventListener("click", function (e) { e.stopPropagation(); });
     bar.appendChild(help);
     bar.addEventListener("click", function () { ctx.commitCfg(function (x) { x.collapsed = !x.collapsed; }); });

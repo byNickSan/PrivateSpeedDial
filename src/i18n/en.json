@@ -66,6 +66,8 @@
   "settings.keyboardNav": "Arrow-key navigation",
   "settings.section.theme": "Color scheme",
   "settings.themeMode": "Theme mode",
+  "settings.darkScheme": "Dark scheme",
+  "settings.lightScheme": "Light scheme",
   "settings.scheme": "Color scheme",
   "theme.auto": "Follow system",
   "theme.light": "Light",

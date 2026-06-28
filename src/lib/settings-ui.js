@@ -144,8 +144,11 @@
         ["auto", SD.i18n.t("theme.auto")], ["light", SD.i18n.t("theme.light")], ["dark", SD.i18n.t("theme.dark")], ["custom", SD.i18n.t("theme.custom")]
       ], s.settings.theme.mode || "auto", function (v) { commit(function (x) { x.settings.theme.mode = v; }); })));
 
-      var opts = s.schemes.map(function (sc) { return [sc.id, sc.name]; });
-      sec.appendChild(row("settings.scheme", sel(opts, s.settings.theme.activeSchemeId, function (v) { commit(function (x) { x.settings.theme.activeSchemeId = v; x.settings.theme.mode = "custom"; }); })));
+      // Separate preferred dark + light scheme; the mode (auto/light/dark) above selects which one applies.
+      var darkOpts = s.schemes.filter(function (sc) { return sc.dark; }).map(function (sc) { return [sc.id, sc.name]; });
+      var lightOpts = s.schemes.filter(function (sc) { return !sc.dark; }).map(function (sc) { return [sc.id, sc.name]; });
+      sec.appendChild(row("settings.darkScheme", sel(darkOpts, s.settings.theme.darkSchemeId || "nord", function (v) { commit(function (x) { x.settings.theme.darkSchemeId = v; }); })));
+      sec.appendChild(row("settings.lightScheme", sel(lightOpts, s.settings.theme.lightSchemeId || "paper", function (v) { commit(function (x) { x.settings.theme.lightSchemeId = v; }); })));
 
       var roles = ["bg", "surface", "text", "accent", "border"];
       var cur = SD.themes.find(s, s.settings.theme.activeSchemeId).colors;

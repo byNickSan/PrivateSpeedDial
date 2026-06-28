@@ -7,6 +7,16 @@
       return state.schemes.filter(function (s) { return s.id === id; })[0] || state.schemes[0];
     }
 
+    // Contrast-aware foreground for the accent fill: dark text on light accents, white on dark/saturated.
+    function onAccent(hex) {
+      var m = /^#?([0-9a-f]{6})$/i.exec(hex || ""); if (!m) return "#ffffff";
+      var n = parseInt(m[1], 16), ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+        v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      var lum = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+      return lum > 0.5 ? "#0b0f14" : "#ffffff";
+    }
+
     function darkPreferred() {
       return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
     }
@@ -15,13 +25,16 @@
       return state.schemes.filter(function (s) { return !!s.dark === wantDark; })[0];
     }
 
-    // Scheme for the current mode; "auto" follows the browser preference.
+    // Scheme for the current mode. The user picks a preferred dark scheme AND a preferred light scheme;
+    // "auto" follows the OS preference between them, "light"/"dark" force one, "custom" uses activeSchemeId.
+    function dark(state) { var s = find(state, state.settings.theme.darkSchemeId); return (s && s.dark) ? s : firstByDark(state, true); }
+    function light(state) { var s = find(state, state.settings.theme.lightSchemeId); return (s && !s.dark) ? s : firstByDark(state, false); }
     function active(state) {
       var th = state.settings.theme, mode = th.mode || "auto";
       if (mode === "custom") return find(state, th.activeSchemeId);
-      if (mode === "light") return firstByDark(state, false) || find(state, th.activeSchemeId);
-      if (mode === "dark") return firstByDark(state, true) || find(state, th.activeSchemeId);
-      return (darkPreferred() ? firstByDark(state, true) : firstByDark(state, false)) || find(state, th.activeSchemeId);
+      if (mode === "light") return light(state);
+      if (mode === "dark") return dark(state);
+      return darkPreferred() ? dark(state) : light(state);
     }
 
     function apply(state) {
@@ -32,6 +45,7 @@
       r.setProperty("--surface", c.surface);
       r.setProperty("--text", c.text);
       r.setProperty("--accent", c.accent);
+      r.setProperty("--on-accent", onAccent(c.accent));   // readable text/icon color ON the accent fill
       r.setProperty("--border", c.border);
       r.setProperty("--font-family", state.settings.font.family);
       r.setProperty("--clock-font", state.settings.font.clock || state.settings.font.family);
@@ -60,6 +74,6 @@
       if (val != null && val !== def) r.setProperty(name, val + (unit || "")); else r.removeProperty(name);
     }
 
-    return { apply: apply, find: find, active: active };
+    return { apply: apply, find: find, active: active, onColor: onAccent };
   })();
 })();

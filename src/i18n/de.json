@@ -66,6 +66,8 @@
   "settings.keyboardNav": "Pfeiltasten-Navigation",
   "settings.section.theme": "Farbschema",
   "settings.themeMode": "Theme-Modus",
+  "settings.darkScheme": "Dunkles Schema",
+  "settings.lightScheme": "Helles Schema",
   "settings.scheme": "Farbschema",
   "theme.auto": "Wie System",
   "theme.light": "Hell",

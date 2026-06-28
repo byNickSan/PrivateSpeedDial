@@ -66,6 +66,8 @@
   "settings.keyboardNav": "Навигация стрелками",
   "settings.section.theme": "Цветовая схема",
   "settings.themeMode": "Режим темы",
+  "settings.darkScheme": "Тёмная схема",
+  "settings.lightScheme": "Светлая схема",
   "settings.scheme": "Цветовая схема",
   "theme.auto": "Как в системе",
   "theme.light": "Светлая",

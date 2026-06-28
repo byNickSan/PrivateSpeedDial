@@ -127,7 +127,7 @@
       a.href = normalizeUrl(d.url) || "#";
       a.setAttribute("data-id", d.id);
       a.tabIndex = 0;
-      if (d.color) a.style.setProperty("--tile-color", d.color);
+      if (d.color) { a.style.setProperty("--tile-color", d.color); a.style.setProperty("--tile-text", SD.themes.onColor(d.color)); }
 
       var wrap = document.createElement("span");
       wrap.className = "dial-ico-wrap";
@@ -219,9 +219,9 @@
         (list || []).concat(SD.icons.faviconCandidates(page)).forEach(function (u) { if (u && !seen[u]) { seen[u] = 1; cands.push(u); } });
         return firstThatLoads(cands);
       }, fallback).then(function (url) {
-        if (!url) return;
-        // Cache the icon BYTES (data: URL) so it renders from storage and is never re-fetched; if the
-        // cross-origin read is blocked, cache the bare URL (browser HTTP cache still helps).
+        // ALWAYS cache something (the favicon service URL as last resort) so the probe runs once and never
+        // re-fires its candidate 404s on later renders/reloads. Cache bytes (data: URL) when readable.
+        url = url || SD.icons.serviceIconUrl(page) || SD.icons.letterDataUrl(d.title || d.url, "", d.url);
         SD.icons.iconToDataUrl(url).then(store, function () { store(url); });
       });
     }
@@ -229,13 +229,15 @@
       var accent = SD.themes.active(state).colors.accent;
       if (k.icon && k.icon.type === "upload" && k.icon.value) { mi.src = k.icon.value; return; }
       if (k.icon && k.icon.type === "library") { var lib = SD.icons.libraryIcon(state, k.icon.value); mi.src = lib ? lib.dataUrl : SD.icons.letterDataUrl(k.title, accent, k.url); return; }
-      if (k.url && state.settings.tile.autoFavicon) {
-        var cands = SD.icons.faviconCandidates(normalizeUrl(k.url)), i = 0;
-        var tn = function () { mi.src = i < cands.length ? cands[i++] : SD.icons.letterDataUrl(k.title || k.url, accent, k.url); };
-        mi.addEventListener("error", function () { tn(); });
-        tn(); return;
+      // Use the cached icon if resolved; otherwise show a letter and resolve once in the background — never
+      // probe favicon paths on every folder render (that caused repeated 404s in the console).
+      if (k.icon && k.icon.cachedUrl) {
+        mi.src = k.icon.cachedUrl;
+        mi.addEventListener("error", function () { mi.src = SD.icons.letterDataUrl(k.title || k.url, accent, k.url); }, { once: true });
+        return;
       }
-      mi.src = SD.icons.letterDataUrl(k.title, accent, k.url);
+      mi.src = SD.icons.letterDataUrl(k.title || k.url, accent, k.url);
+      if (k.url && state.settings.tile.autoFavicon) resolveAndCache(k);
     }
 
     function folderTile(d, state) {
@@ -245,7 +247,7 @@
       el.setAttribute("role", "button");
       el.tabIndex = 0;
       el.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openFolder(d); } });
-      if (d.color) el.style.setProperty("--tile-color", d.color);
+      if (d.color) { el.style.setProperty("--tile-color", d.color); el.style.setProperty("--tile-text", SD.themes.onColor(d.color)); }
       var wrap = document.createElement("span"); wrap.className = "dial-ico-wrap";
       var prev = document.createElement("span"); prev.className = "folder-preview";
       var kids = state.dials.filter(function (x) { return x.parentId === d.id; }).sort(byOrder).slice(0, 4);
@@ -296,7 +298,9 @@
 
       var fTitle = D.el("input", { "class": "f-title", type: "text" }); fTitle.value = model.title || "";
       var fUrl = D.el("input", { "class": "f-url", type: "url", placeholder: "https://" }); fUrl.value = model.url || "";
+      var fColorOn = D.el("input", { "class": "f-color-on", type: "checkbox" }); fColorOn.checked = !!model.color;   // off = theme surface (no forced dark tile)
       var fColor = D.el("input", { "class": "f-color", type: "color" }); fColor.value = model.color || "#1e293b";
+      fColor.addEventListener("input", function () { fColorOn.checked = true; });
       var fIcon = D.el("select", { "class": "f-icon" });
       [["auto", "dial.iconAuto"], ["library", "dial.iconLibrary"], ["upload", "dial.iconUpload"], ["letter", "dial.iconLetter"]]
         .forEach(function (o) { fIcon.appendChild(D.el("option", { value: o[0], text: t(o[1]) })); });
@@ -329,7 +333,7 @@
       var iconLabel = D.el("label", {}, [t("dial.icon"), fIcon, iconRefresh]);
       var iconVariants = D.el("div", { "class": "icon-variants" });
       node.appendChild(urlLabel);
-      node.appendChild(D.el("label", {}, [t("dial.color"), fColor]));
+      node.appendChild(D.el("label", {}, [t("dial.color"), fColorOn, fColor]));
       node.appendChild(iconLabel);
       node.appendChild(fFile);
       node.appendChild(lib);
@@ -427,7 +431,7 @@
       save.addEventListener("click", function () {
         var isFolder = !model.parentId && fFolder.checked;
         model.type = isFolder ? "folder" : "link";
-        model.color = fColor.value;
+        model.color = fColorOn.checked ? fColor.value : "";
         model.title = fTitle.value.trim().slice(0, 60);
         if (isFolder) {
           model.url = "";
