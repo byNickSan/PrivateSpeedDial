@@ -11,20 +11,20 @@
   <div id="bg"></div>
   <div id="bg-overlay"></div>
 
-  <header id="topbar">
-    <nav id="tabs"></nav>
-    <div class="topbar-right">
-      <span id="sync-status" class="sync-status" hidden></span>
-      <button id="lock-toggle" class="icon-btn" title="Lock"></button>
-      <button id="theme-toggle" class="icon-btn" title="Theme"></button>
-      <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
-    </div>
-  </header>
-
   <main id="main">
     <aside id="widgets-left" class="widgets-col"></aside>
     <section id="grid-wrap">
       <div id="search"></div>
+      <header id="topbar">
+        <nav id="tabs"></nav>
+        <div class="topbar-right">
+          <span id="sync-status" class="sync-status" hidden></span>
+          <button id="lock-toggle" class="icon-btn" title="Lock"></button>
+          <button id="tabsmode-toggle" class="icon-btn" title="Tabs mode"></button>
+          <button id="theme-toggle" class="icon-btn" title="Theme"></button>
+          <button id="settings-btn" class="icon-btn" title="Settings"></button>
+        </div>
+      </header>
       <div id="grid"></div>
     </section>
     <aside id="widgets-right" class="widgets-col"></aside>
@@ -87,6 +87,7 @@
   <script src="../lib/themes.js"></script>
   <script src="../lib/animations.js"></script>
   <script src="../lib/backgrounds.js"></script>
+  <script src="../lib/aquarium.js"></script>
   <!-- services -->
   <script src="../lib/icons.js"></script>
   <script src="../lib/fonts.js"></script>

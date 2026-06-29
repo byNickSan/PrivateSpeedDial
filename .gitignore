@@ -12,6 +12,10 @@ node_modules/
 build/
 DerivedData/
 
+# Local dev tooling (not shipped)
+tools/genmap.sh
+.claude/map.md
+
 # OS / editor
 .DS_Store
 Thumbs.db

@@ -8,6 +8,8 @@
     var wrap = document.createElement("div");
     wrap.className = "tasks";
 
+    var hint = ctx.reminders.hintNode(ctx); if (hint) wrap.appendChild(hint);
+
     var add = document.createElement("div");
     add.className = "task-add";
     var input = document.createElement("input");
@@ -73,7 +75,7 @@
   // cancel pending reminders before the instance is removed
   function onDelete(inst, ctx) { (inst.config.items || []).forEach(function (it) { ctx.reminders.cancel("task", it.id); }); }
 
-  function defaultConfig() { return { items: [] }; }
+  function defaultConfig() { return { items: [], notifyHintDismissed: false }; }
 
   SD.registry.register({ id: "tasks", kind: "local", titleKey: "widget.tasks", order: 30, mount: mount, onDelete: onDelete, defaultConfig: defaultConfig });
 })();

@@ -12,6 +12,8 @@
   --fs-caption: 12px; --fs-ui: 13px; --fs-body: 14px; --fs-base: 16px; --fs-lg: 20px; --fs-xl: 25px; --fs-2xl: 31px;
   --content-max: 1600px;
   --focus-ring: 2px solid var(--accent);
+  --ctrl-w: 140px;   /* reserved width for the right control cluster (lock+theme+settings, expanded) */
+  --tabs-reserve: 56px;   /* right-edge reserve so tabs clear the collapsed settings gear (touch: full cluster) */
 
   /* Density: comfortable (default). A user's manual layout settings override these via themes.js. */
   --tile-target: 132px; --tile-cap: 156px; --tile-gap: 20px; --tile-radius: 16px; --tile-pad: 12px;
@@ -48,7 +50,7 @@ body {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--text) 30%, transparent); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
-::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 50%, transparent); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); background-clip: padding-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
 
 /* Background layers */
@@ -64,18 +66,77 @@ body.tab-hidden #bg.bg-animated { animation-play-state: paused; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
+/* Conic (multi-colour wheel) preset: rotate the whole wheel around the centre instead of panning. */
+@property --bg-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+#bg.bg-conic { background-size: cover; }
+#bg.bg-conic.bg-animated { animation: bg-rotate var(--bg-anim-speed) linear infinite; }
+@keyframes bg-rotate { to { --bg-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) { #bg.bg-animated { animation: none; } }
+#bg-fx { position: fixed; inset: 0; z-index: -2; pointer-events: none; }   /* aquarium fish canvas, over the water gradient */
 #bg-overlay { position: fixed; inset: 0; z-index: -1; background: #000; opacity: var(--bg-dim); pointer-events: none; }
 
 /* Top bar */
-#topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; gap: 12px; }
-#tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+/* Control bar now lives above the dials inside the central column: tabs left, lock/theme/settings right.
+   Aligned + capped to the content width so it sits over the dial grid. */
+/* Controls are taken OUT OF FLOW (absolute, right) so the tab strip spans the full bar and its centering is
+   independent of the controls' (hover-changing) width — tabs no longer shift when the controls expand. */
+#topbar { position: relative; max-width: var(--content-max); margin: 0 auto var(--sp-12); padding: 0; }
+/* Single-line tab strip: ALWAYS one row at a readable size. On overflow it SCROLLS horizontally — driven by
+   mouse position (JS pans the strip as the cursor moves); native swipe on touch. Scrollbar hidden. The RIGHT
+   --tabs-reserve keeps the last tab clear of the settings gear when scrolled to the end. */
+#tabs { display: flex; gap: 6px; flex-wrap: nowrap; min-width: 0; align-items: center; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none; padding: 5px var(--tabs-reserve) 5px 12px; box-sizing: border-box; scroll-behavior: auto; -webkit-overflow-scrolling: touch; }
+#tabs::-webkit-scrollbar { display: none; }
+#tabs[data-align="center"] { justify-content: safe center; }
+#tabs[data-align="left"] { justify-content: flex-start; }
+/* Multi-line mode (explicit user choice): tabs wrap to several rows. A floated spacer reserves ONLY the first
+   row's right corner (so just the first line clears the settings cluster; lower rows use full width). */
+#tabs.tabs-wrap { display: block; flex-wrap: wrap; overflow: visible; white-space: normal; padding-right: 2px; }
+#tabs.tabs-wrap::before { content: ""; float: right; width: var(--tabs-reserve); height: 34px; }
+#tabs.tabs-wrap .tab { display: inline-flex; vertical-align: middle; margin: 0 6px 6px 0; }
+#tabs.tabs-wrap[data-align="center"] { text-align: center; }
+#tabs.tabs-wrap[data-align="left"] { text-align: left; }
+/* On touch the control cluster is always expanded (no hover) → reserve its full width so tabs never hide
+   behind it; the user swipes the strip natively. */
+@media (pointer: coarse) { :root { --tabs-reserve: 132px; } }
 .tab {
+  flex: 0 0 auto; white-space: nowrap;
   background: var(--surface); color: var(--text); border: 1px solid var(--border);
-  border-radius: 10px; padding: 6px 14px; cursor: pointer; font: inherit;
+  border-radius: 10px; cursor: pointer; font: inherit; padding: 6px 14px;
+  transition: border-color .16s ease, color .16s ease, background .16s ease;
 }
-.tab.active { border-color: var(--accent); color: var(--accent); }
+.tab:hover { border-color: var(--accent); }
+#tabs.tabs-wrap .tab:hover { background: var(--surface-2, var(--surface)); }
+.tab { transition: border-color .16s ease, color .16s ease, background .16s ease, transform .16s ease; }
+.tab.active { border-color: var(--accent); color: var(--accent); font-weight: 600; transform: scale(1.1); transform-origin: center center; z-index: 1; }
 .tab.add { font-weight: 700; }
-.topbar-right { display: flex; align-items: center; gap: 10px; }
+/* Controls pinned to the top-right, fixed height matching the first tab row (icons centered within). Same
+   position in single-line AND multi-row → no vertical shift when the mode changes. */
+.topbar-right { position: absolute; right: 0; top: 0; height: 44px; display: flex; align-items: center; gap: 0; }
+/* Collapsed by default — settings gear is the anchor; lock + theme "deal out like cards" on hover/focus:
+   they start small (scaled down) and grow to full size with a bounce (back-out easing), staggered. Keeps the
+   cluster from eating space. On touch (no hover) they're shown via the coarse-pointer rule. */
+.topbar-right .icon-btn {
+  transition: max-width .22s ease, opacity .18s ease, margin .22s ease, transform .28s cubic-bezier(.34, 1.56, .64, 1);
+}
+.topbar-right #lock-toggle, .topbar-right #theme-toggle, .topbar-right #tabsmode-toggle {
+  max-width: 0; opacity: 0; margin: 0; overflow: hidden; pointer-events: none; padding: 0; border-width: 0;
+  transform: scale(.45); transform-origin: right center;
+}
+.topbar-right:hover #lock-toggle, .topbar-right:hover #theme-toggle, .topbar-right:hover #tabsmode-toggle,
+.topbar-right:focus-within #lock-toggle, .topbar-right:focus-within #theme-toggle, .topbar-right:focus-within #tabsmode-toggle {
+  max-width: 40px; opacity: 1; margin-right: 8px; pointer-events: auto; padding: 0; border-width: 1px; transform: scale(1);
+}
+/* stagger: icons deal out one after another — spread effect */
+.topbar-right:hover #theme-toggle, .topbar-right:focus-within #theme-toggle { transition-delay: 0s; }
+.topbar-right:hover #tabsmode-toggle, .topbar-right:focus-within #tabsmode-toggle { transition-delay: .05s; }
+.topbar-right:hover #lock-toggle, .topbar-right:focus-within #lock-toggle { transition-delay: .1s; }
+@media (pointer: coarse) {
+  .topbar-right #lock-toggle, .topbar-right #theme-toggle, .topbar-right #tabsmode-toggle { max-width: 40px; opacity: 1; margin-right: 8px; pointer-events: auto; border-width: 1px; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar-right .icon-btn { transition: max-width .15s, opacity .15s; transform: none; }
+  .topbar-right:hover .icon-btn, .topbar-right:focus-within .icon-btn { transform: none; transition-delay: 0s; }
+}
 .sync-status { font-size: 12px; opacity: .8; }
 #perf-overlay { position: fixed; top: 6px; left: 8px; z-index: 9999; pointer-events: none; font: 600 12px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; color: #7CFC00; background: rgba(0,0,0,.45); padding: 2px 6px; border-radius: 6px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .w-key-help { font-size: 12px; color: var(--accent); text-decoration: none; }
@@ -85,7 +146,7 @@ body.tab-hidden #bg.bg-animated { animation-play-state: paused; }
 #scroll-top:hover { background: var(--accent); color: var(--on-accent, #fff); border-color: var(--accent); }
 .feed-loadnew.floating { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 51; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 .sync-status.offline { color: #fbbf24; }
-.icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 36px; height: 36px; cursor: pointer; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; }
+.icon-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 10px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: inline-flex; align-items: center; justify-content: center; }
 .icon-btn.active { border-color: var(--accent); color: var(--accent); }
 
 /* UI lock (topbar padlock): hide every edit affordance and disable layout drag. */
@@ -196,6 +257,11 @@ body.no-dials #grid { display: none; }
 .widget-settings .set-row > .pair, .widget-settings .set-row > a, .widget-settings .set-row > button { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .widget-settings input, .widget-settings select { max-width: 200px; box-sizing: border-box; }
 .w-row { display: flex; justify-content: space-between; padding: 2px 0; }
+/* Stacked: text on top (full width), Test button UNDER it, dismiss × in the corner — button never squeezes the text. */
+.notify-hint { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding: 8px 26px 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: color-mix(in srgb, var(--accent) 8%, transparent); font-size: var(--fs-caption); }
+.notify-hint-txt { color: var(--text-muted); line-height: 1.4; }
+.notify-test { align-self: flex-start; padding: 5px 12px; font-size: var(--fs-caption); }
+.notify-hint-x { position: absolute; top: 4px; right: 6px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; }
 .w-cache { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
 .w-err { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: var(--fs-body); color: var(--text-muted); padding: 8px 2px; }
 .w-retry { align-self: flex-start; }
@@ -586,7 +652,7 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .sticky-footer { position: sticky; bottom: -22px; background: var(--bg); padding-top: 10px; }
 
 /* Search bar */
-#search { margin: 4px 0 22px; }
+#search { margin: var(--sp-24) 0 var(--sp-32); }   /* generous breathing room above + below search (desktop) */
 .search-wrap { position: relative; width: 100%; max-width: 600px; margin: 0 auto; box-sizing: border-box; }
 .search-bar { display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 6px 10px; }
 .search-bar:focus-within { outline: var(--focus-ring); outline-offset: 2px; }   /* input keeps outline:none; ring shows on the bar */
@@ -598,6 +664,8 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .se-name { font-size: 12px; opacity: .85; }
 .se-caret { font-size: 10px; opacity: .6; }
 .search-input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font: inherit; font-size: 15px; padding: 6px 4px; }
+.search-go { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+.search-go:hover { color: var(--accent); }
 .search-menu { position: absolute; top: 100%; left: 0; margin-top: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,.4); z-index: 50; min-width: 170px; }
 .search-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); cursor: pointer; font: inherit; padding: 7px 10px; border-radius: 8px; }
 .search-menu-item:hover { background: color-mix(in srgb, var(--text) 12%, transparent); }
@@ -623,8 +691,8 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
   /* Intrinsic grid reduces columns by width on its own; per designer §3 breakpoints handle layout shifts
      and page padding only, not tile sizing. Keep just a tighter gap + min-height here. */
   :root { --tile-h: 96px; --tile-gap: 12px; }
-  #topbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
-  #theme-toggle { display: none; }
+  #topbar { gap: 8px; }
+  #search { margin: var(--sp-12) 0; }   /* tighter on phones */
   #tabs { gap: 4px; }
   .tab { padding: 5px 10px; }
   #main { padding: 10px 0 28px; gap: 14px; }   /* no side gutter — widgets go edge-to-edge */

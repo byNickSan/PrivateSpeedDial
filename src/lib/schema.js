@@ -58,6 +58,9 @@
           showDials: true,      // central dials grid; off frees space for wider widget columns
           perfOverlay: false,   // fixed top-left tab-memory readout (Chromium performance.memory; "—" elsewhere)
           density: "comfortable",  // design-system density preset: comfortable | compact (drives --tile-*/icon tokens)
+          tabsAlign: "center",     // group tabs alignment: center | left
+          tabsWrap: false,         // group tabs on multiple rows; off = single-line dock (fisheye, fits all)
+          tabsAutoScroll: true,    // deprecated (kept for back-compat; the strip no longer scrolls — see dock)
           font: { family: "system-ui, sans-serif", size: 13, labelColor: "", clock: "", notes: "" },
           showLabels: true,
           theme: { activeSchemeId: "nord", darkSchemeId: "nord", lightSchemeId: "paper", mode: "auto" },

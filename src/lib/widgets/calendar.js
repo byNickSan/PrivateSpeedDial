@@ -23,6 +23,8 @@
 
     D.clear(el);
 
+    var hint = ctx.reminders.hintNode(ctx); if (hint) el.appendChild(hint);
+
     var prev = D.el("button", { "class": "cal-prev", text: "‹" });
     var next = D.el("button", { "class": "cal-next", text: "›" });
     prev.addEventListener("click", function () { st.view = new Date(y, m - 1, 1); mount(el, ctx); });
@@ -83,7 +85,7 @@
   // cancel pending reminders before the instance is removed
   function onDelete(inst, ctx) { (inst.config.events || []).forEach(function (ev) { ctx.reminders.cancel("cal", ev.id); }); }
 
-  function defaultConfig() { return { events: [] }; }
+  function defaultConfig() { return { events: [], notifyHintDismissed: false }; }
 
   SD.registry.register({ id: "calendar", kind: "local", titleKey: "widget.calendar", order: 40, mount: mount, onDelete: onDelete, defaultConfig: defaultConfig });
 })();

@@ -3,7 +3,7 @@
 // clocks don't merge.
 (function () {
   "use strict";
-  var ticking = false, poisoning = false, tickTimer = null, visWired = false;
+  var ticking = false, poisoning = false, tickTimer = null, visWired = false, rolled = {};
 
   function parts(tz) {
     var opt = { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" };
@@ -88,6 +88,30 @@
     // Fill the just-created faces directly (the widget isn't in the document yet, so a global query
     // would miss them) — this gives nixie/digital their real width/height immediately, no late reflow.
     grid.querySelectorAll(".clock-face").forEach(updateFace);
+    // First mount this session → a cool "loading roll": flip faces flick through random digits, nixie does
+    // its cathode sweep, then both settle to the real time. (Deferred so the card is in the DOM.)
+    var iid = ctx.inst && ctx.inst.instId;
+    if (iid && !rolled[iid]) {
+      rolled[iid] = 1;
+      var flips = grid.querySelectorAll('.clock-face[data-style="htc-flip"]');
+      var hasNix = grid.querySelector('.clock-face[data-style="nixie"][data-style]') && grid.querySelector('.nixie[data-sweep="1"]');
+      if (flips.length || hasNix) setTimeout(function () {
+        Array.prototype.forEach.call(flips, rollFlip);
+        if (hasNix) antiPoison();
+      }, 40);
+    }
+  }
+
+  // Mechanical-clock loading roll: flick the flap units through random digits a few times, then settle.
+  function rollFlip(face) {
+    var secs = face.getAttribute("data-sec") === "1";
+    var units = [face.querySelector(".fu-h"), face.querySelector(".fu-m")];
+    if (secs) units.push(face.querySelector(".fu-s"));
+    var n = 0;
+    var iv = setInterval(function () {
+      for (var i = 0; i < units.length; i++) { if (units[i]) flipUnit(units[i], pad(Math.floor(Math.random() * 100))); }
+      if (++n >= 6) { clearInterval(iv); updateFace(face); }
+    }, 150);
   }
 
   function nixieString(face) {
@@ -359,5 +383,5 @@
     return { style: "htc-flip", digitalStyle: "mono", mechTheme: "auto", mechFlipSpeed: 5, nixieSweep: true, showSeconds: true, format24: true, cardBg: false, cardBorder: false, cities: [{ id: SD.schema.uid(), label: "City", timeZone: "" }], cityLabelSize: 13, cityLabelStyle: "normal" };
   }
 
-  SD.registry.register({ id: "clock", kind: "local", titleKey: "widget.clock", order: 10, skeleton: ".clock-face", mount: mount, renderSettings: renderSettings, defaultConfig: defaultConfig });
+  SD.registry.register({ id: "clock", kind: "local", titleKey: "widget.clock", order: 10, mount: mount, renderSettings: renderSettings, defaultConfig: defaultConfig });
 })();

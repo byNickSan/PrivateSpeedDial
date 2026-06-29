@@ -62,6 +62,10 @@
       sec.appendChild(row("settings.density", sel([
         ["comfortable", SD.i18n.t("density.comfortable")], ["compact", SD.i18n.t("density.compact")]
       ], s.settings.density || "comfortable", function (v) { commit(function (x) { x.settings.density = v; }); })));
+      sec.appendChild(row("settings.tabsAlign", sel([
+        ["center", SD.i18n.t("align.center")], ["left", SD.i18n.t("align.left")]
+      ], s.settings.tabsAlign || "center", function (v) { commit(function (x) { x.settings.tabsAlign = v; }); })));
+      sec.appendChild(row("settings.tabsWrap", check(!!s.settings.tabsWrap, function (v) { commit(function (x) { x.settings.tabsWrap = v; }); })));
       // 0 = Auto (intrinsic grid fits columns to width); >0 pins a fixed count (advanced override).
       sec.appendChild(row("settings.columns", num(s.settings.grid.columns, 0, 12, 1, function (v) { commit(function (x) { x.settings.grid.columns = Math.max(0, v || 0); }); })));
       sec.appendChild(row("settings.rows", num(s.settings.grid.rows, 1, 12, 1, function (v) { commit(function (x) { x.settings.grid.rows = v; }); })));
@@ -182,7 +186,9 @@
       })));
 
       sec.appendChild(row("settings.gradientPreset", sel([
-        ["theme", SD.i18n.t("bg.theme")], ["aurora", SD.i18n.t("bg.aurora")], ["flame", SD.i18n.t("bg.flame")], ["tide", SD.i18n.t("bg.tide")], ["custom", SD.i18n.t("bg.custom")]
+        ["theme", SD.i18n.t("bg.theme")], ["aurora", SD.i18n.t("bg.aurora")], ["flame", SD.i18n.t("bg.flame")], ["tide", SD.i18n.t("bg.tide")],
+        ["conic", SD.i18n.t("bg.conic")], ["conic2", SD.i18n.t("bg.conic2")], ["meadow", SD.i18n.t("bg.meadow")], ["autumn", SD.i18n.t("bg.autumn")], ["vista", SD.i18n.t("bg.vista")], ["aquarium", SD.i18n.t("bg.aquarium")],
+        ["custom", SD.i18n.t("bg.custom")]
       ], bg.gradient.preset, function (v) { commit(function (x) { x.settings.background.gradient.preset = v; }); })));
       sec.appendChild(row("settings.gradientAnimated", check(bg.gradient.animated, function (v) { commit(function (x) { x.settings.background.gradient.animated = v; }); })));
       sec.appendChild(row("settings.gradientSpeed", num(bg.gradient.animSpeedMs, 1000, 60000, 500, function (v) { commit(function (x) { x.settings.background.gradient.animSpeedMs = v; }); })));

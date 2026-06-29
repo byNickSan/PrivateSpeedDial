@@ -44,6 +44,21 @@
       });
     }
 
+    // Start typing anywhere (a printable key, not in a field/modal) → focus the search box so the keystroke
+    // lands there. Digits are left for group switching (keyboard.js). Bound once.
+    function bindTypeToFocus() {
+      if (SD._searchTypeBound) return;
+      SD._searchTypeBound = true;
+      document.addEventListener("keydown", function (e) {
+        if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || /^[0-9]$/.test(e.key)) return;
+        var t = e.target, tag = (t && t.tagName || "").toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select" || (t && t.isContentEditable)) return;
+        if (document.querySelector(".modal.open")) return;
+        var input = document.querySelector(".search-input");
+        if (input && document.activeElement !== input) input.focus();   // the key then lands in the input
+      });
+    }
+
     function render(el, ctx) {
       var s = ctx.store.get();
       SD.dom.clear(el);
@@ -92,7 +107,20 @@
         });
         menu.appendChild(item);
       });
-      pick.addEventListener("click", function () { menu.hidden = !menu.hidden; });
+      var openMenu = function (focusFirst) {
+        menu.hidden = false;
+        if (focusFirst) { var f = menu.querySelector(".search-menu-item.sel") || menu.querySelector(".search-menu-item"); if (f) f.focus(); }
+      };
+      pick.addEventListener("click", function () { if (menu.hidden) openMenu(false); else menu.hidden = true; });
+      pick.addEventListener("keydown", function (e) { if (e.key === "ArrowDown") { e.preventDefault(); openMenu(true); } });
+      // Arrow-key navigation within the engine menu; Escape closes and returns focus to the picker.
+      menu.addEventListener("keydown", function (e) {
+        var items = Array.prototype.slice.call(menu.querySelectorAll(".search-menu-item"));
+        var i = items.indexOf(document.activeElement);
+        if (e.key === "ArrowDown") { e.preventDefault(); (items[i + 1] || items[0]).focus(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); (items[i - 1] || items[items.length - 1]).focus(); }
+        else if (e.key === "Escape") { e.preventDefault(); menu.hidden = true; pick.focus(); }
+      });
 
       var input = document.createElement("input");
       input.type = "search";
@@ -100,8 +128,17 @@
       input.setAttribute("aria-label", ctx.i18n.t("search.placeholder"));
       input.setAttribute("placeholder", ctx.i18n.t("search.placeholder"));
 
+      // Magnifier submit button — search with the mouse.
+      var go = document.createElement("button");
+      go.type = "submit";
+      go.className = "search-go";
+      go.title = ctx.i18n.t("search.go");
+      go.setAttribute("aria-label", ctx.i18n.t("search.go"));
+      go.appendChild(SD.dom.svg("search", 18));
+
       form.appendChild(pick);
       form.appendChild(input);
+      form.appendChild(go);
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var q = input.value.trim();
@@ -112,6 +149,7 @@
       wrap.appendChild(menu);
       el.appendChild(wrap);
       bindOutsideClose();
+      bindTypeToFocus();
     }
 
     return { ENGINES: ENGINES, available: available, browserLang: browserLang, engineFor: engineFor, byId: byId, render: render };

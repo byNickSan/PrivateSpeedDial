@@ -8,15 +8,54 @@
     setTimeout(function () { appBooting = false; }, 1500);
 
     function renderAll(state) {
-      renderTabs(state);
+      // Each section guarded independently: a failure in one (e.g. the tab dock) must not blank the whole page.
+      SD.safe("renderTabs", function () { renderTabs(state); });
       SD.safe("search", function () { SD.search.render(document.getElementById("search"), SD.ctx); });
-      renderGrid(state);
-      renderWidgets(state);
+      SD.safe("renderGrid", function () { renderGrid(state); });
+      SD.safe("renderWidgets", function () { renderWidgets(state); });
     }
 
     function renderTabs(state) {
       var tabs = document.getElementById("tabs");
+      var prevScroll = tabs.scrollLeft;   // innerHTML="" resets it to 0 → restore after rebuild (no click-flicker)
       tabs.innerHTML = "";
+      tabs.setAttribute("data-align", state.settings.tabsAlign === "left" ? "left" : "center");
+      // Single-line = dock (fisheye, fits all); multi-row when tabsWrap is set.
+      var wrap = !!state.settings.tabsWrap;
+      tabs.classList.toggle("tabs-wrap", wrap);
+      if (tabs.parentElement) tabs.parentElement.classList.toggle("tabs-wrapped", wrap);   // pins controls to top corner
+      // Pan-scroll handlers, attached once to the persistent #tabs element (children rebuilt each render).
+      if (!tabs.__pan) {
+        var touchLike = function () {
+          return (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+            /Mobi|Android|iPhone|iPad|iPod|Tablet|Silk/i.test(navigator.userAgent || "");
+        };
+        // Mouse-position pan: cursor X across the strip maps to scroll position, eased toward the target so it
+        // glides. Touch uses native swipe (no pan, no animation). One readable row; scroll reveals the rest.
+        var target = 0, raf = null, panning = false;
+        var step = function () {
+          var max = tabs.scrollWidth - tabs.clientWidth;
+          if (max <= 0 || !panning) { raf = null; return; }
+          var dx = target - tabs.scrollLeft;
+          if (Math.abs(dx) < 0.5) tabs.scrollLeft = target; else tabs.scrollLeft += dx * 0.12;   // gentle ease/decel
+          raf = requestAnimationFrame(step);
+        };
+        tabs.addEventListener("mousemove", function (e) {
+          if (touchLike() || tabs.classList.contains("tabs-wrap")) return;
+          var max = tabs.scrollWidth - tabs.clientWidth;
+          if (max <= 0) { panning = false; return; }
+          var r = tabs.getBoundingClientRect(), pad = Math.min(90, r.width * 0.12);   // edge dead-zones reach 0/end
+          var ratio = Math.max(0, Math.min(1, (e.clientX - r.left - pad) / (r.width - 2 * pad)));
+          target = ratio * max; panning = true;
+          if (!raf) raf = requestAnimationFrame(step);
+        });
+        tabs.addEventListener("mouseleave", function () { panning = false; });
+        tabs.addEventListener("wheel", function (e) {
+          if (e.deltaY && tabs.scrollWidth > tabs.clientWidth) { tabs.scrollLeft += e.deltaY; target = tabs.scrollLeft; e.preventDefault(); }
+        }, { passive: false });
+        tabs.__pan = 1;
+      }
+      var activeTab = null;
       state.groups.slice().sort(byOrder).forEach(function (g) {
         var b = document.createElement("button");
         b.className = "tab" + (g.id === state.settings.activeGroupId ? " active" : "");
@@ -24,12 +63,22 @@
         b.addEventListener("click", function () { SD.store.commit(function (s) { s.settings.activeGroupId = g.id; }); });
         b.addEventListener("dblclick", function () { renameGroup(state, g); });
         tabs.appendChild(b);
+        if (g.id === state.settings.activeGroupId) activeTab = b;
       });
       var add = document.createElement("button");
       add.className = "tab add"; add.textContent = "+";
       add.title = SD.i18n.t("group.add");
       add.addEventListener("click", function () { addGroup(state); });
       tabs.appendChild(add);
+      // Restore scroll across the rebuild; only re-centre when the active tab is actually off-screen (clicking
+      // an already-visible tab must NOT jump the strip).
+      if (!wrap && tabs.scrollWidth > tabs.clientWidth) {
+        tabs.scrollLeft = prevScroll;
+        if (activeTab) {
+          var aL = activeTab.offsetLeft, aR = aL + activeTab.offsetWidth, vL = tabs.scrollLeft, vR = vL + tabs.clientWidth;
+          if (aL < vL + 8 || aR > vR - 8) tabs.scrollLeft = Math.max(0, aL - tabs.clientWidth / 2 + activeTab.offsetWidth / 2);
+        }
+      }
     }
 
     function addGroup(state) {
@@ -97,8 +146,22 @@
       });
     }
 
+    // Signature of everything that affects the dial grid (incl. dnd's lock read). When unchanged we skip the
+    // full rebuild so unrelated commits (notes/widgets) don't recreate tiles & reload icon <img> → no flicker.
+    function gridSig(state) {
+      var gid = state.settings.activeGroupId, s = state.settings;
+      var parts = [gid, s.grid.columns, !!s.lockDials, !!s.locked, s.tile.autoFavicon !== false, s.showLabels !== false];
+      state.dials.filter(function (d) { return d.groupId === gid && !d.parentId; }).sort(byOrder).forEach(function (d) {
+        var ic = d.icon || {};
+        parts.push([d.id, d.title || "", d.url || "", ic.type || "", ic.value || "", ic.cachedUrl || "", d.color || "", d.order, d.type || ""].join("|"));
+      });
+      return parts.join("¦");
+    }
     function renderGrid(state) {
       var grid = document.getElementById("grid");
+      var sig = gridSig(state);
+      if (grid.__sig === sig) return;   // nothing grid-relevant changed → don't rebuild (kills icon flicker)
+      grid.__sig = sig;
       grid.innerHTML = "";
       // 0 = Auto (intrinsic auto-fit); >0 = pinned column count (advanced override).
       var cols = state.settings.grid.columns;

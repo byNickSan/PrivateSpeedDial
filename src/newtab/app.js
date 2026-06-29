@@ -16,6 +16,7 @@
     updateSyncStatus();
     updateThemeToggle(state);
     updateLockToggle(state);
+    updateTabsModeToggle(state);
     document.body.classList.toggle("is-locked", !!state.settings.locked);
     document.documentElement.style.setProperty("--widget-col-w", (state.settings.widgetColWidth || 300) + "px");
     document.body.classList.toggle("no-dials", state.settings.showDials === false);
@@ -79,8 +80,19 @@
     if (!el) return;
     var mode = state.settings.theme.mode || "auto";
     SD.dom.clear(el);
-    el.appendChild(SD.dom.svg(mode === "light" ? "sun" : mode === "dark" ? "moon" : "monitor", 18));
+    el.appendChild(SD.dom.svg(mode === "light" ? "sun" : mode === "dark" ? "moon" : "monitor", 20));
     el.title = SD.i18n.t("settings.themeMode") + ": " + SD.i18n.t("theme." + mode);
+  }
+
+  // Quick toggle: single-line dock tabs ↔ multi-row tabs. Mirrors the tabsWrap setting.
+  function updateTabsModeToggle(state) {
+    var el = document.getElementById("tabsmode-toggle");
+    if (!el) return;
+    var multi = !!state.settings.tabsWrap;
+    SD.dom.clear(el);
+    el.appendChild(SD.dom.svg(multi ? "rows" : "oneline", 20));
+    el.classList.toggle("active", !multi);
+    el.title = SD.i18n.t(multi ? "tabsmode.multi" : "tabsmode.single");
   }
 
   // Padlock: unlocked = open icon + active (accent) look + editing allowed; locked = closed icon, plain grey.
@@ -89,7 +101,7 @@
     if (!el) return;
     var locked = !!state.settings.locked;
     SD.dom.clear(el);
-    el.appendChild(SD.dom.svg(locked ? "lock" : "unlock", 18));
+    el.appendChild(SD.dom.svg(locked ? "lock" : "unlock", 20));
     el.classList.toggle("active", !locked);
     el.title = SD.i18n.t(locked ? "lock.unlock" : "lock.lock");
   }
@@ -172,10 +184,14 @@
 
   function wire() {
     var settingsBtn = document.getElementById("settings-btn");
+    settingsBtn.appendChild(SD.dom.svg("settings", 20));
     settingsBtn.addEventListener("click", function () { SD.settingsUi.open(); });
     settingsBtn.title = SD.i18n.t("settings.title");
     document.getElementById("lock-toggle").addEventListener("click", function () {
       SD.store.commit(function (s) { s.settings.locked = !s.settings.locked; });
+    });
+    document.getElementById("tabsmode-toggle").addEventListener("click", function () {
+      SD.store.commit(function (x) { x.settings.tabsWrap = !x.settings.tabsWrap; });   // single-line dock ↔ multi-row
     });
     document.getElementById("theme-toggle").addEventListener("click", function () {
       var modes = ["auto", "light", "dark"];
