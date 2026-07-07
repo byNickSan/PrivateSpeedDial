@@ -371,12 +371,12 @@
       var fFile = D.el("input", { type: "file", accept: "image/*,.ico,.svg" }); fFile.style.display = "none";
       var lib = D.el("div", { "class": "icon-library" });
 
-      node.appendChild(D.el("label", {}, [t("dial.title"), fTitle]));
+      var titleLabel = D.el("label", {}, [t("dial.title"), fTitle]);
 
       // folder toggle, top-level only — no nested folders
       var fFolder = D.el("input", { type: "checkbox" });
       fFolder.checked = model.type === "folder";
-      if (!model.parentId) node.appendChild(D.el("label", { "class": "set-row" }, [t("dial.folder"), fFolder]));
+      var folderLabel = !model.parentId ? D.el("label", { "class": "set-row" }, [t("dial.folder"), fFolder]) : null;
 
       var urlLabel = D.el("label", {}, [t("dial.url"), fUrl]);
       var iconRefresh = D.el("button", { "class": "icon-refresh", type: "button", title: t("dial.refreshIcon"), text: "↻" });
@@ -395,7 +395,9 @@
       function syncIconRefresh() { iconRefresh.style.display = fIcon.value === "auto" && !fFolder.checked ? "" : "none"; }
       var iconLabel = D.el("label", {}, [t("dial.icon"), fIcon, iconRefresh]);
       var iconVariants = D.el("div", { "class": "icon-variants" });
-      node.appendChild(urlLabel);
+      node.appendChild(urlLabel);          // URL first + focused on open
+      node.appendChild(titleLabel);
+      if (folderLabel) node.appendChild(folderLabel);
       node.appendChild(D.el("label", {}, [t("dial.color"), fColorOn, fColor]));
       node.appendChild(iconLabel);
       node.appendChild(fFile);
@@ -485,6 +487,7 @@
       });
 
       var close = SD.ui.openModal(node);
+      try { fUrl.focus(); fUrl.select(); } catch (e) { /* noop */ }   // URL field focused first when adding a dial
       cancel.addEventListener("click", close);
       if (del) del.addEventListener("click", function () {
         // Deleting a folder also removes the dials it contains.

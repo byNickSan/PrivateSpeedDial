@@ -212,6 +212,24 @@ body[data-hover="scale"] .dial:hover { transform: scale(1.06); }
 body[data-hover="lift"] .dial:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(0,0,0,.35); }
 body[data-hover="glow"] .dial:hover { box-shadow: 0 0 0 2px var(--accent), 0 0 22px var(--accent); }
 
+/* Keyboard-nav focus: clearly visible in every scheme (accent ring + glow + tint + slight lift) */
+.dial:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 20px 2px color-mix(in srgb, var(--accent) 65%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--tile-color, var(--surface)));
+  transform: scale(1.06); z-index: 3;
+}
+/* Drag-and-drop: dim the source, show where it will land, light up a folder that will accept it */
+.dial.dragging { opacity: .4; }
+.dial.drop-before::before, .dial.drop-after::after { content: ""; position: absolute; top: 8%; bottom: 8%; width: 4px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 8px var(--accent); z-index: 4; }
+.dial.drop-before::before { left: -7px; }
+.dial.drop-after::after { right: -7px; }
+.dial.folder.folder-drop {
+  outline: 3px solid var(--accent); outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--tile-color, var(--surface))); transform: scale(1.08); z-index: 4;
+}
+
 /* Widgets panel */
 /* Three widget zones: left + right columns flank the grid; bottom is a full-width row.
    Zones stay present (a slim "+" when empty) so they remain add targets and drop targets. */
@@ -620,7 +638,9 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 
 /* Modals */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 900; }
-.modal-box { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 22px; width: min(560px, 94vw); max-height: 88vh; overflow: auto; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+/* settings: top-anchored so switching to a short tab doesn't recenter the box (tab bar stays under the cursor) */
+.modal.settings-modal { align-items: flex-start; padding: 5vh 0; }
+.modal-box { background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 22px; width: min(560px, 94vw); max-height: 88vh; overflow: auto; scrollbar-gutter: stable; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 .modal-box h3 { margin-top: 0; }
 .dial-editor label { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
 .settings { text-align: left; }
@@ -633,6 +653,16 @@ body.is-minimal #main, body.is-minimal #topbar { display: none; }
 .settings input[type=checkbox] { width: auto; }
 .set-section { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 14px; }
 .set-section h4 { margin: 6px 0; opacity: .85; }
+/* tabbed settings: top tab bar + one visible page; search reveals all pages */
+.set-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 4px; border-bottom: 1px solid var(--border); }
+.set-tab { appearance: none; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted, var(--text)); padding: 8px 12px; min-height: 40px; font: inherit; cursor: pointer; border-radius: 8px 8px 0 0; }
+.set-tab:hover { background: var(--surface); }
+.set-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.set-tab:focus-visible { outline: var(--focus-ring, 2px solid var(--accent)); outline-offset: -2px; }
+.set-page { display: none; }
+.set-page.active { display: block; }
+.settings.searching .set-page { display: block; }
+.set-page > .set-section:first-child { border-top: 0; margin-top: 4px; }
 .subsec { padding-left: 10px; border-left: 2px solid var(--border); margin: 8px 0; }
 .pair { display: flex; gap: 6px; min-width: 0; max-width: 100%; flex-wrap: wrap; }
 .pair > * { flex: 1 1 80px; min-width: 0; max-width: 100%; box-sizing: border-box; }

@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   SD.schema = (function () {
-    var VERSION = 3;
+    var VERSION = 4;
 
     function uid() {
       return Date.now().toString(36) + Math.floor(performance.now() * 1000 % 1e6).toString(36) +
@@ -70,6 +70,7 @@
             color: "",
             image: { dataUrl: "" },
             autoImage: { enabled: false, provider: "loremflickr", apiKey: "", query: "", intervalMin: 30, cache: null },
+            env: { time: "auto", season: "auto", weather: "clear", randomWeather: false },   // §B time/season/weather for canvas scenes
             blur: 0, dim: 0
           },
           animation: { hover: "scale", speedMs: 180, groupSwitch: "fade", keyboardNav: true },
@@ -150,8 +151,15 @@
       return s;
     }
 
+    // v4: add background.env (time/season/weather) for canvas scenes; backfill on existing configs.
+    function migrateV4(s) {
+      var b = s.settings && s.settings.background;
+      if (b && !b.env) b.env = { time: "auto", season: "auto", weather: "clear", randomWeather: false };
+      return s;
+    }
+
     // migration ladder; each entry: { to: N, up(state) -> state }
-    var MIGRATIONS = [{ to: 2, up: migrateV2 }, { to: 3, up: migrateV3 }];
+    var MIGRATIONS = [{ to: 2, up: migrateV2 }, { to: 3, up: migrateV3 }, { to: 4, up: migrateV4 }];
 
     function migrate(state) {
       if (!state || typeof state !== "object") return defaults();

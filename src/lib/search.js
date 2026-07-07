@@ -127,6 +127,8 @@
       input.className = "search-input";
       input.setAttribute("aria-label", ctx.i18n.t("search.placeholder"));
       input.setAttribute("placeholder", ctx.i18n.t("search.placeholder"));
+      // Esc drops focus from the search box so arrow-key dial navigation can resume.
+      input.addEventListener("keydown", function (e) { if (e.key === "Escape") { e.preventDefault(); input.blur(); } });
 
       // Magnifier submit button — search with the mouse.
       var go = document.createElement("button");

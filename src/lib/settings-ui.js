@@ -3,6 +3,16 @@
   "use strict";
   SD.settingsUi = (function () {
     var lastClose = null;
+    var activeTabKey = "settings.tab.view";   // persists across rebuilds (e.g. locale change)
+
+    // Tabbed layout: related sections grouped under top tabs instead of one long scroll.
+    var TABS = [
+      ["settings.tab.view", [sectionLayout, sectionTypography, sectionAnimation]],
+      ["settings.tab.appearance", [sectionTheme, sectionBackground]],
+      ["settings.tab.content", [sectionSearch, sectionWidgets]],
+      ["settings.tab.language", [sectionLanguage]],
+      ["settings.tab.data", [sectionSync, sectionData]]
+    ];
 
     function buildPanel() {
       var state = SD.store.get();
@@ -10,16 +20,46 @@
       node.className = "settings";
       node.appendChild(h3(SD.i18n.t("settings.title")));
       node.appendChild(searchBox(node));
-      node.appendChild(sectionLanguage(state));
-      node.appendChild(sectionLayout(state));
-      node.appendChild(sectionTypography(state));
-      node.appendChild(sectionAnimation(state));
-      node.appendChild(sectionSearch(state));
-      node.appendChild(sectionTheme(state));
-      node.appendChild(sectionBackground(state));
-      node.appendChild(sectionSync(state));
-      node.appendChild(sectionWidgets(state));
-      node.appendChild(sectionData(state));
+
+      var bar = document.createElement("div"); bar.className = "set-tabs"; bar.setAttribute("role", "tablist");
+      var pagesWrap = document.createElement("div"); pagesWrap.className = "set-pages";
+      var tabBtns = [], pages = [];
+
+      function activate(i) {
+        activeTabKey = TABS[i][0];
+        tabBtns.forEach(function (b, j) {
+          var on = i === j;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
+          b.tabIndex = on ? 0 : -1;
+        });
+        pages.forEach(function (p, j) { p.classList.toggle("active", i === j); });
+      }
+
+      TABS.forEach(function (t, i) {
+        var b = document.createElement("button");
+        b.className = "set-tab"; b.type = "button"; b.setAttribute("role", "tab");
+        b.textContent = SD.i18n.t(t[0]);
+        b.addEventListener("click", function () { activate(i); });
+        bar.appendChild(b); tabBtns.push(b);
+
+        var page = document.createElement("div"); page.className = "set-page"; page.setAttribute("role", "tabpanel");
+        t[1].forEach(function (fn) { page.appendChild(fn(state)); });
+        pagesWrap.appendChild(page); pages.push(page);
+      });
+
+      bar.addEventListener("keydown", function (e) {   // arrow-key tab nav
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        var cur = tabBtns.findIndex(function (b) { return b.classList.contains("active"); });
+        var ni = (cur + (e.key === "ArrowRight" ? 1 : -1) + TABS.length) % TABS.length;
+        activate(ni); tabBtns[ni].focus();
+      });
+
+      node.appendChild(bar);
+      node.appendChild(pagesWrap);
+      var start = TABS.findIndex(function (t) { return t[0] === activeTabKey; });
+      activate(start < 0 ? 0 : start);
       return node;
     }
 
@@ -31,6 +71,7 @@
       footer.appendChild(closeBtn);
       node.appendChild(footer);
       var close = SD.ui.openModal(node);
+      var ov = node.closest(".modal"); if (ov) ov.classList.add("settings-modal");   // top-anchored: tab bar stays put across tabs
       lastClose = close;
       closeBtn.addEventListener("click", close);
     }
@@ -42,6 +83,7 @@
       inp.placeholder = SD.i18n.t("settings.search");
       inp.addEventListener("input", function () {
         var q = inp.value.trim().toLowerCase();
+        panel.classList.toggle("searching", !!q);   // while searching, reveal all tab pages so cross-tab hits show
         panel.querySelectorAll(".set-section").forEach(function (sec) {
           var any = false;
           sec.querySelectorAll(".set-row").forEach(function (r) {
@@ -217,6 +259,25 @@
         sec.appendChild(row("settings.bgAutoInterval", num(bg.autoImage.intervalMin, 1, 1440, 1, function (v) {
           commit(function (x) { x.settings.background.autoImage.intervalMin = v; });
         })));
+      }
+
+      // Environment (time/season/weather) — only for canvas scenes that opt into the shared §B layer.
+      if (bg.type === "gradient" && SD.bgEngine && SD.bgEngine.usesEnv(bg.gradient.preset)) {
+        var env = bg.env || {};
+        var setEnv = function (k, v) { commit(function (x) { (x.settings.background.env = x.settings.background.env || {})[k] = v; }); };
+        var sub = document.createElement("div"); sub.className = "subsec";
+        var h = document.createElement("h4"); h.textContent = SD.i18n.t("settings.section.env"); sub.appendChild(h);
+        sub.appendChild(row("bgenv.time", sel([
+          ["auto", SD.i18n.t("bgenv.auto")], ["day", SD.i18n.t("bgenv.day")], ["sunset", SD.i18n.t("bgenv.sunset")], ["night", SD.i18n.t("bgenv.night")]
+        ], env.time || "auto", function (v) { setEnv("time", v); })));
+        sub.appendChild(row("bgenv.season", sel([
+          ["auto", SD.i18n.t("bgenv.auto")], ["spring", SD.i18n.t("bgenv.spring")], ["summer", SD.i18n.t("bgenv.summer")], ["autumn", SD.i18n.t("bgenv.autumn")], ["winter", SD.i18n.t("bgenv.winter")]
+        ], env.season || "auto", function (v) { setEnv("season", v); })));
+        sub.appendChild(row("bgenv.weather", sel([
+          ["clear", SD.i18n.t("bgenv.clear")], ["rain", SD.i18n.t("bgenv.rain")], ["snow", SD.i18n.t("bgenv.snow")], ["fog", SD.i18n.t("bgenv.fog")]
+        ], env.weather || "clear", function (v) { setEnv("weather", v); })));
+        sub.appendChild(row("bgenv.random", check(!!env.randomWeather, function (v) { setEnv("randomWeather", v); })));
+        sec.appendChild(sub);
       }
 
       sec.appendChild(row("settings.blur", num(bg.blur, 0, 30, 1, function (v) { commit(function (x) { x.settings.background.blur = v; }); })));

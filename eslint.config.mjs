@@ -18,6 +18,7 @@ export default [
         setInterval: "readonly",
         clearInterval: "readonly",
         requestAnimationFrame: "readonly",
+        cancelAnimationFrame: "readonly",
         performance: "readonly",
         structuredClone: "readonly",
         matchMedia: "readonly",

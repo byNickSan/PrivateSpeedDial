@@ -22,7 +22,7 @@
           return "linear-gradient(160deg, #7c2d12, #b45309 35%, #d97706 58%, #f59e0b 80%, #fde68a)";
         case "vista":    // green aurora ribbons (Vista vibe, non-blue, original art)
           return "linear-gradient(160deg, #07261d, #0f5b41 32%, #1f9e74 56%, #66e3b0 82%, #d8fff0)";
-        case "aquarium": // underwater gradient (animated fish drawn on a canvas on top — see SD.aquarium)
+        case "aquarium": // underwater gradient (animated fish drawn on the canvas on top — see bg-scene-aquarium.js)
           return "linear-gradient(180deg, #013a63 0%, #01497c 32%, #2c7da0 64%, #61a5c2 100%)";
         case "conic":    // 5 colors around the centre; when animated, the whole wheel rotates (see CSS --bg-angle)
           return "conic-gradient(from var(--bg-angle, 0deg) at 50% 50%, #ff5f6d, #ffc371 25%, #2dd4bf 50%, #4b7bec 72%, #a55eea 88%, #ff5f6d)";
@@ -83,7 +83,7 @@
       el.style.backgroundImage = "";
       el.style.backgroundColor = "";
       el.style.backgroundSize = "";
-      var aquarium = false;
+      var canvasScene = null;
 
       if (bg.type === "color") {
         // Empty color = transparent, so the scheme background shows through.
@@ -103,11 +103,11 @@
         if (g.animated) el.classList.add("bg-animated");
         else if (!conic) el.style.backgroundSize = "cover";
         el.style.setProperty("--bg-anim-speed", (g.animSpeedMs || 14000) + "ms");
-        aquarium = g.preset === "aquarium";
+        if (SD.bgEngine && SD.bgEngine.has(g.preset)) canvasScene = g.preset;   // canvas scene draws over this gradient
       }
       document.documentElement.style.setProperty("--bg-blur", (bg.blur || 0) + "px");
       document.documentElement.style.setProperty("--bg-dim", (bg.dim || 0) / 100);
-      if (SD.aquarium) SD.aquarium[aquarium ? "start" : "stop"]();   // canvas fish only for the aquarium preset
+      if (SD.bgEngine) { if (canvasScene) SD.bgEngine.select(canvasScene); else SD.bgEngine.stop(); }   // canvas scenes via the engine
     }
 
     return { apply: apply, gradientCss: gradientCss, autoImageUrl: autoImageUrl, autoImageOrigin: autoImageOrigin, AUTO_PROVIDERS: AUTO_PROVIDERS };

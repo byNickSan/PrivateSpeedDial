@@ -30,7 +30,7 @@
       if (ni === cur) return false;
       var fromId = list[cur].getAttribute("data-id"), toId = list[ni].getAttribute("data-id");
       if (!fromId || !toId || !SD.dnd || !SD.dnd.reorder) return false;
-      SD.dnd.reorder(st, fromId, toId);
+      SD.dnd.reorder(st, fromId, toId, delta > 0);
       // Re-focus the moved dial after the re-render.
       requestAnimationFrame(function () { var el = document.querySelector('#grid .dial[data-id="' + fromId + '"]'); if (el) el.focus(); });
       return true;
@@ -61,6 +61,10 @@
         var d = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
         if (d != null && moveDial(d, st)) e.preventDefault();
         return;
+      }
+      // Space opens the focused dial (anchors fire Enter natively; folders handle Enter/Space themselves).
+      if ((e.key === " " || e.key === "Spacebar") && ae && ae.classList && ae.classList.contains("dial") && !ae.classList.contains("folder")) {
+        e.preventDefault(); ae.click(); return;
       }
       switch (e.key) {
         case "ArrowRight": move(1); e.preventDefault(); break;
